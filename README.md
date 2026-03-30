@@ -1,0 +1,114 @@
+# SkillSkill
+
+Agent-readable skills, packaged as durable workflow assets.
+
+SkillSkill is an early-stage repo for authoring, packaging, and validating high-quality skill files. Today it ships one skill, `write-skills`, with dual packaging:
+
+- the repo root is the canonical package for Codex-oriented use
+- `.claude/skills/write-skills/` is the committed Claude Code mirror
+
+The current goal is narrow on purpose: get one skill package right before expanding the catalog.
+
+## What `write-skills` Does
+
+`write-skills` helps an AI:
+
+- create a new skill from a workflow, prompt, transcript, or notes
+- revise an existing skill so it routes and performs better
+- critique a skill against a clear rubric and rewrite weak parts
+- package the result for Codex when the request is Codex-specific
+
+The methodology stays cross-tool by default. Packaging details are added only when the caller asks for a specific platform.
+
+## Package Layout
+
+- `SKILL.md`: canonical skill definition
+- `agents/openai.yaml`: Codex metadata
+- `.claude/skills/write-skills/SKILL.md`: Claude project-skill mirror
+- `references/`: rubric and review checklist used by the skill
+- `scripts/validate_skill.py`: dependency-free validator for package quality and drift
+- `tests/fixtures/`: valid and intentionally broken fixtures for validator checks
+
+## How To Use
+
+### Codex
+
+Use the repo root as the source package. Install into Codex with:
+
+```bash
+./scripts/install.sh --codex
+```
+
+If you need to replace an existing install target:
+
+```bash
+./scripts/install.sh --codex --force
+```
+
+The installer symlinks this repo into `${CODEX_HOME:-~/.codex}/skills/write-skills`.
+
+Then invoke it in Codex prompts with `$write-skills`, for example:
+
+- `Use $write-skills to turn this workflow into a skill.`
+- `Use $write-skills to review this SKILL.md and rewrite weak parts.`
+
+### Claude Code
+
+This repo already contains a project-local Claude skill at `.claude/skills/write-skills/`, so anyone who opens this repo in Claude Code can use it in that workspace immediately.
+
+If you also want a personal Claude install across all projects, run:
+
+```bash
+./scripts/install.sh --claude
+```
+
+That symlinks the committed Claude mirror into `${CLAUDE_HOME:-~/.claude}/skills/write-skills`.
+
+From this workspace Claude Code can use it automatically when relevant or you can invoke it directly with:
+
+```text
+/write-skills
+```
+
+Example:
+
+```text
+/write-skills turn this transcript into a reusable skill
+```
+
+### Both Tools
+
+If you use both Codex and Claude personally, install both with:
+
+```bash
+./scripts/install.sh --all
+```
+
+## Validation
+
+Validate the canonical Codex package:
+
+```bash
+python3 scripts/validate_skill.py --expect-codex .
+```
+
+Validate both Codex and Claude packaging together:
+
+```bash
+python3 scripts/validate_skill.py --expect-codex --expect-claude .
+```
+
+The validator checks:
+
+- required package files
+- `name` and `description` frontmatter
+- single-line descriptions
+- contract, output, edge-case, and example guidance
+- Claude description length limits
+- drift between the canonical skill and the Claude mirror
+
+## Status
+
+This is an honest v1. There is no registry or multi-skill catalog here yet. The repo is currently centered on one packaged skill and one validator, with a small set of references and fixtures to keep the quality bar explicit.
+
+If the project grows, the next step is more skills built with the same standards: precise routing, explicit contracts, lean core files, and validation that matches the package shape.
