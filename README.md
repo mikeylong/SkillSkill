@@ -2,7 +2,7 @@
 
 Agent-readable skills, packaged as durable workflow assets.
 
-SkillSkill is an early-stage repo for authoring, packaging, and validating high-quality skill files. Today it ships one skill, `write-skills`, with dual packaging:
+SkillSkill is for authoring, packaging, and validating high-quality skill files. Today it ships one skill, `write-skills`, with dual packaging:
 
 - the repo root is the canonical package for Codex-oriented use
 - `.claude/skills/write-skills/` is the committed Claude Code mirror
