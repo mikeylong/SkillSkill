@@ -15,7 +15,7 @@ SkillSkill is for authoring, packaging, and validating high-quality skill files.
 - the repo root is the canonical package for Codex-oriented use
 - `.claude/skills/skillskill/` is the committed Claude Code mirror
 
-The current goal is narrow on purpose: get one skill package right before expanding the catalog.
+The repo centers on `skillskill`, its supporting references, and the validation workflow that keeps the package consistent across Codex and Claude.
 
 ## What `skillskill` Does
 
@@ -122,9 +122,3 @@ The validator checks:
 - contract, output, edge-case, and example guidance
 - Claude description length limits
 - drift between the canonical skill and the Claude mirror
-
-## Status
-
-This is an honest v1. There is no registry or multi-skill catalog here yet. The repo is currently centered on one packaged skill and one validator, with a small set of references and fixtures to keep the quality bar explicit.
-
-If the project grows, the next step is more skills built with the same standards: precise routing, explicit contracts, lean core files, and validation that matches the package shape.
