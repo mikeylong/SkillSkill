@@ -2,7 +2,7 @@
 
 `skillskill` is useful when a team has already figured out a workflow in one good AI session and wants to make it reusable. For example, imagine an engineer who spends 25 minutes teaching an assistant how to turn a week of merged PRs into release notes. The good result depends on lots of tacit instructions: group changes by feature, separate customer-facing updates from internal chores, call out migrations or risky changes, ignore reverted work, and end with a short QA checklist. `skillskill` takes that successful chat and turns it into a real skill package with a clear trigger description, an output contract, edge cases, and examples. The next time someone asks for release notes, the agent can route to the skill instead of being retaught from scratch.
 
-> Use `/skillskill` to turn this release-notes workflow into a reusable skill. The skill should trigger when someone wants release notes from merged PRs, group changes by feature, separate customer-facing notes from internal chores, call out migrations and risky changes, ignore reverted work, and end with a short QA checklist.
+> Use `/SkillSkill` to turn this release-notes workflow into a reusable skill. The skill should trigger when someone wants release notes from merged PRs, group changes by feature, separate customer-facing notes from internal chores, call out migrations and risky changes, ignore reverted work, and end with a short QA checklist.
 
 The result would be a reusable skill package that tells the agent when to use this workflow, what output to produce, and which edge cases to handle.
 
@@ -71,10 +71,10 @@ If you need to replace an existing install target:
 
 The installer symlinks this repo into `${CODEX_HOME:-~/.codex}/skills/skillskill`.
 
-Then invoke it in Codex with `/skillskill`, for example:
+Then invoke it in Codex with `/SkillSkill`, for example:
 
-- `/skillskill turn this workflow into a skill.`
-- `/skillskill review this SKILL.md and rewrite weak parts.`
+- `/SkillSkill turn this workflow into a skill.`
+- `/SkillSkill review this SKILL.md and rewrite weak parts.`
 
 ### Claude Code
 
@@ -91,13 +91,13 @@ That symlinks the committed Claude mirror into `${CLAUDE_HOME:-~/.claude}/skills
 From this workspace Claude Code can use it automatically when relevant or you can invoke it directly with:
 
 ```text
-/skillskill
+/SkillSkill
 ```
 
 Example:
 
 ```text
-/skillskill turn this transcript into a reusable skill
+/SkillSkill turn this transcript into a reusable skill
 ```
 
 ## Validation
