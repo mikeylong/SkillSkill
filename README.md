@@ -1,6 +1,6 @@
-<p align="center"><img src="./skillskill_mascot.png" alt="SkillSkill mascot" width="560"></p>
+<p align="center"><img src="./skillskill_mascot.png" alt="/SkillSkill mascot" width="560"></p>
 
-`skillskill` is useful when a team has already figured out a workflow in one good AI session and wants to make it reusable. For example, imagine an engineer who spends 25 minutes teaching an assistant how to turn a week of merged PRs into release notes. The good result depends on lots of tacit instructions: group changes by feature, separate customer-facing updates from internal chores, call out migrations or risky changes, ignore reverted work, and end with a short QA checklist. `skillskill` takes that successful chat and turns it into a real skill package with a clear trigger description, an output contract, edge cases, and examples. The next time someone asks for release notes, the agent can route to the skill instead of being retaught from scratch.
+`/SkillSkill` is useful when a team has already figured out a workflow in one good AI session and wants to make it reusable. For example, imagine an engineer who spends 25 minutes teaching an assistant how to turn a week of merged PRs into release notes. The good result depends on lots of tacit instructions: group changes by feature, separate customer-facing updates from internal chores, call out migrations or risky changes, ignore reverted work, and end with a short QA checklist. `/SkillSkill` takes that successful chat and turns it into a real skill package with a clear trigger description, an output contract, edge cases, and examples. The next time someone asks for release notes, the agent can route to the skill instead of being retaught from scratch.
 
 > Use `/SkillSkill` to turn this release-notes workflow into a reusable skill. The skill should trigger when someone wants release notes from merged PRs, group changes by feature, separate customer-facing notes from internal chores, call out migrations and risky changes, ignore reverted work, and end with a short QA checklist.
 
@@ -14,20 +14,20 @@ Compared with keeping the workflow as an ad hoc prompt, a skill gives you:
 - Better edge-case coverage: it handles messy or ambiguous inputs more reliably.
 - Cleaner separation of core behavior from platform-specific details: the method stays general instead of being tangled with one tool's packaging.
 
-# SkillSkill
+# /SkillSkill
 
 Agent-readable skills, packaged as durable workflow assets.
 
-SkillSkill is for authoring, packaging, and validating high-quality skill files. Today it ships one skill, `skillskill`, with dual packaging:
+/SkillSkill is for authoring, packaging, and validating high-quality skill files. Today it ships one skill, `/SkillSkill`, with dual packaging:
 
 - the repo root is the canonical package for Codex-oriented use
 - `.claude/skills/skillskill/` is the committed Claude Code mirror
 
-The repo centers on `skillskill`, its supporting references, and the validation workflow that keeps the package consistent across Codex and Claude.
+The repo centers on `/SkillSkill`, its supporting references, and the validation workflow that keeps the package consistent across Codex and Claude.
 
-## What `skillskill` Does
+## What `/SkillSkill` Does
 
-`skillskill` helps an AI:
+`/SkillSkill` helps an AI:
 
 - create a new skill from a workflow, prompt, transcript, or notes
 - revise an existing skill so it routes and performs better
@@ -46,7 +46,7 @@ The methodology stays cross-tool by default. Packaging details are added only wh
 
 ## Worked Example
 
-See [examples/frontend-skill-critique/README.md](examples/frontend-skill-critique/README.md) for a complete before-and-after example of using `skillskill` to critique and rewrite an existing skill.
+See [examples/frontend-skill-critique/README.md](examples/frontend-skill-critique/README.md) for a complete before-and-after example of using `/SkillSkill` to critique and rewrite an existing skill.
 
 ## Package Layout
 
