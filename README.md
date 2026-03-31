@@ -1,3 +1,5 @@
+<p align="center"><img src="./skillskill_mascot.png" alt="SkillSkill mascot" width="320"></p>
+
 # SkillSkill
 
 Agent-readable skills, packaged as durable workflow assets.
