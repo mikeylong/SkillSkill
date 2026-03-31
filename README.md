@@ -47,6 +47,14 @@ The methodology stays cross-tool by default. Packaging details are added only wh
 
 ## How To Use
 
+### Both Tools
+
+If you use both Codex and Claude personally, install both with:
+
+```bash
+./scripts/install.sh --all
+```
+
 ### Codex
 
 Use the repo root as the source package. Install into Codex with:
@@ -90,14 +98,6 @@ Example:
 
 ```text
 /skillskill turn this transcript into a reusable skill
-```
-
-### Both Tools
-
-If you use both Codex and Claude personally, install both with:
-
-```bash
-./scripts/install.sh --all
 ```
 
 ## Validation
