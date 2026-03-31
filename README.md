@@ -1,8 +1,8 @@
 <p align="center"><img src="./skillskill_mascot.png" alt="SkillSkill mascot" width="560"></p>
 
-`write-skills` is useful when a team has already figured out a workflow in one good AI session and wants to make it reusable. For example, imagine an engineer who spends 25 minutes teaching an assistant how to turn a week of merged PRs into release notes. The good result depends on lots of tacit instructions: group changes by feature, separate customer-facing updates from internal chores, call out migrations or risky changes, ignore reverted work, and end with a short QA checklist. `write-skills` takes that successful chat and turns it into a real skill package with a clear trigger description, an output contract, edge cases, and examples. The next time someone asks for release notes, the agent can route to the skill instead of being retaught from scratch.
+`skillskill` is useful when a team has already figured out a workflow in one good AI session and wants to make it reusable. For example, imagine an engineer who spends 25 minutes teaching an assistant how to turn a week of merged PRs into release notes. The good result depends on lots of tacit instructions: group changes by feature, separate customer-facing updates from internal chores, call out migrations or risky changes, ignore reverted work, and end with a short QA checklist. `skillskill` takes that successful chat and turns it into a real skill package with a clear trigger description, an output contract, edge cases, and examples. The next time someone asks for release notes, the agent can route to the skill instead of being retaught from scratch.
 
-> Use `$write-skills` to turn this release-notes workflow into a reusable skill. The skill should trigger when someone wants release notes from merged PRs, group changes by feature, separate customer-facing notes from internal chores, call out migrations and risky changes, ignore reverted work, and end with a short QA checklist.
+> Use `/skillskill` to turn this release-notes workflow into a reusable skill. The skill should trigger when someone wants release notes from merged PRs, group changes by feature, separate customer-facing notes from internal chores, call out migrations and risky changes, ignore reverted work, and end with a short QA checklist.
 
 The result would be a reusable skill package that tells the agent when to use this workflow, what output to produce, and which edge cases to handle.
 
@@ -10,16 +10,16 @@ The result would be a reusable skill package that tells the agent when to use th
 
 Agent-readable skills, packaged as durable workflow assets.
 
-SkillSkill is for authoring, packaging, and validating high-quality skill files. Today it ships one skill, `write-skills`, with dual packaging:
+SkillSkill is for authoring, packaging, and validating high-quality skill files. Today it ships one skill, `skillskill`, with dual packaging:
 
 - the repo root is the canonical package for Codex-oriented use
-- `.claude/skills/write-skills/` is the committed Claude Code mirror
+- `.claude/skills/skillskill/` is the committed Claude Code mirror
 
 The current goal is narrow on purpose: get one skill package right before expanding the catalog.
 
-## What `write-skills` Does
+## What `skillskill` Does
 
-`write-skills` helps an AI:
+`skillskill` helps an AI:
 
 - create a new skill from a workflow, prompt, transcript, or notes
 - revise an existing skill so it routes and performs better
@@ -28,11 +28,19 @@ The current goal is narrow on purpose: get one skill package right before expand
 
 The methodology stays cross-tool by default. Packaging details are added only when the caller asks for a specific platform.
 
+## Example Requests
+
+- `Turn this workflow into a skill.`
+- `Use this transcript to draft a reusable skill package.`
+- `Use this prompt to create a skill.`
+- `Critique this SKILL.md and rewrite weak parts.`
+- `Revise this skill for Claude and Codex.`
+
 ## Package Layout
 
 - `SKILL.md`: canonical skill definition
 - `agents/openai.yaml`: Codex metadata
-- `.claude/skills/write-skills/SKILL.md`: Claude project-skill mirror
+- `.claude/skills/skillskill/SKILL.md`: Claude project-skill mirror
 - `references/`: rubric and review checklist used by the skill
 - `scripts/validate_skill.py`: dependency-free validator for package quality and drift
 - `tests/fixtures/`: valid and intentionally broken fixtures for validator checks
@@ -53,16 +61,16 @@ If you need to replace an existing install target:
 ./scripts/install.sh --codex --force
 ```
 
-The installer symlinks this repo into `${CODEX_HOME:-~/.codex}/skills/write-skills`.
+The installer symlinks this repo into `${CODEX_HOME:-~/.codex}/skills/skillskill`.
 
-Then invoke it in Codex prompts with `$write-skills`, for example:
+Then invoke it in Codex with `/skillskill`, for example:
 
-- `Use $write-skills to turn this workflow into a skill.`
-- `Use $write-skills to review this SKILL.md and rewrite weak parts.`
+- `/skillskill turn this workflow into a skill.`
+- `/skillskill review this SKILL.md and rewrite weak parts.`
 
 ### Claude Code
 
-This repo already contains a project-local Claude skill at `.claude/skills/write-skills/`, so anyone who opens this repo in Claude Code can use it in that workspace immediately.
+This repo already contains a project-local Claude skill at `.claude/skills/skillskill/`, so anyone who opens this repo in Claude Code can use it in that workspace immediately.
 
 If you also want a personal Claude install across all projects, run:
 
@@ -70,18 +78,18 @@ If you also want a personal Claude install across all projects, run:
 ./scripts/install.sh --claude
 ```
 
-That symlinks the committed Claude mirror into `${CLAUDE_HOME:-~/.claude}/skills/write-skills`.
+That symlinks the committed Claude mirror into `${CLAUDE_HOME:-~/.claude}/skills/skillskill`.
 
 From this workspace Claude Code can use it automatically when relevant or you can invoke it directly with:
 
 ```text
-/write-skills
+/skillskill
 ```
 
 Example:
 
 ```text
-/write-skills turn this transcript into a reusable skill
+/skillskill turn this transcript into a reusable skill
 ```
 
 ### Both Tools

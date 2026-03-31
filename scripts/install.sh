@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Install write-skills for Codex and/or Claude.
+Install skillskill for Codex and/or Claude.
 
 Usage:
   ./scripts/install.sh [--codex] [--claude] [--all] [--force]
@@ -101,9 +101,9 @@ install_target() {
 }
 
 if [[ "$install_codex" -eq 1 ]]; then
-  install_target "Codex" "$repo_root" "$codex_home/skills/write-skills"
+  install_target "Codex" "$repo_root" "$codex_home/skills/skillskill"
 fi
 
 if [[ "$install_claude" -eq 1 ]]; then
-  install_target "Claude" "$repo_root/.claude/skills/write-skills" "$claude_home/skills/write-skills"
+  install_target "Claude" "$repo_root/.claude/skills/skillskill" "$claude_home/skills/skillskill"
 fi

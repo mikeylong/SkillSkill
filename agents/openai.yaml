@@ -1,4 +1,4 @@
 interface:
-  display_name: "Write Skills"
+  display_name: "SkillSkill"
   short_description: "Author and critique skill files"
-  default_prompt: "Use $write-skills to draft, revise, or critique an agent-readable skill from this workflow."
+  default_prompt: "Use /skillskill to draft, revise, or critique an agent-readable skill from this workflow."

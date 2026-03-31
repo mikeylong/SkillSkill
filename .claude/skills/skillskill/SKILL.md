@@ -1,10 +1,10 @@
 ---
-name: "write-skills"
+name: "skillskill"
 description: "Create, revise, or critique agent-readable skill files from workflows, prompts, transcripts, or existing skills. Produces stronger skill packages with precise descriptions, explicit contracts, edge cases, examples, and packaging guidance when needed."
 argument-hint: "[request or path]"
 ---
 
-# Write Skills
+# SkillSkill
 
 Use this skill to turn workflow knowledge into a durable, high-quality skill package, or to repair a weak skill so it routes and performs better for agents.
 

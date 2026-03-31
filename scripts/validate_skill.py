@@ -107,10 +107,10 @@ def check_required_files(
 
 
 def check_claude_mirror(skill_dir: Path, result: ValidationResult) -> Path | None:
-    claude_skill_md = skill_dir / ".claude" / "skills" / "write-skills" / "SKILL.md"
+    claude_skill_md = skill_dir / ".claude" / "skills" / "skillskill" / "SKILL.md"
     if not claude_skill_md.is_file():
         result.errors.append(
-            "missing required Claude project skill: .claude/skills/write-skills/SKILL.md"
+            "missing required Claude project skill: .claude/skills/skillskill/SKILL.md"
         )
         return None
     return claude_skill_md
@@ -268,7 +268,7 @@ def validate_skill_dir(skill_dir: Path, expect_codex: bool, expect_claude: bool)
     if expect_claude:
         if (skill_dir / ".claude" / "skills").exists():
             validate_claude_skill(skill_dir, skill_md, result)
-        elif skill_dir.parts[-3:] == (".claude", "skills", "write-skills"):
+        elif skill_dir.parts[-3:] == (".claude", "skills", "skillskill"):
             validate_claude_frontmatter(data, result)
         else:
             validate_claude_frontmatter(data, result)
