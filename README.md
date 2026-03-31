@@ -6,6 +6,14 @@
 
 The result would be a reusable skill package that tells the agent when to use this workflow, what output to produce, and which edge cases to handle.
 
+Compared with keeping the workflow as an ad hoc prompt, a skill gives you:
+
+- Sharper routing: it's clearer when the skill should be invoked.
+- Explicit contracts: it defines what the skill should return.
+- Clearer workflow: it gives a more disciplined authoring process.
+- Better edge-case coverage: it handles messy or ambiguous inputs more reliably.
+- Cleaner separation of core behavior from platform-specific details: the method stays general instead of being tangled with one tool's packaging.
+
 # SkillSkill
 
 Agent-readable skills, packaged as durable workflow assets.
@@ -36,11 +44,16 @@ The methodology stays cross-tool by default. Packaging details are added only wh
 - `Critique this SKILL.md and rewrite weak parts.`
 - `Revise this skill for Claude and Codex.`
 
+## Worked Example
+
+See [examples/frontend-skill-critique/README.md](examples/frontend-skill-critique/README.md) for a complete before-and-after example of using `skillskill` to critique and rewrite an existing skill.
+
 ## Package Layout
 
 - `SKILL.md`: canonical skill definition
 - `agents/openai.yaml`: Codex metadata
 - `.claude/skills/skillskill/SKILL.md`: Claude project-skill mirror
+- `examples/`: worked documentation bundles showing real critique and rewrite flows
 - `references/`: rubric and review checklist used by the skill
 - `scripts/validate_skill.py`: dependency-free validator for package quality and drift
 - `tests/fixtures/`: valid and intentionally broken fixtures for validator checks
