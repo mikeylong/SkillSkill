@@ -1,9 +1,9 @@
 ---
-name: frontend-skill
+name: frontend-skill-example-after
 description: Design and implement visually directed landing pages or product UIs from requests like "make this feel premium" or "redesign this dashboard", producing a clear visual thesis, section plan, and restrained interface with strong hierarchy, imagery, and motion.
 ---
 
-# Frontend Skill
+# Frontend Skill Example After
 
 Use this skill when the request is not only to build UI, but to make the UI feel intentional. It is for landing pages, websites, demos, prototypes, and high-importance app surfaces where art direction, hierarchy, restraint, imagery, and motion materially affect the result.
 
