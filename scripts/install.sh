@@ -9,7 +9,7 @@ Usage:
   ./scripts/install.sh [--codex] [--claude] [--all] [--force]
 
 Options:
-  --codex   Install into the local Codex skills directory.
+  --codex   Install a clean Codex runtime package into the local Codex skills directory.
   --claude  Install into the local Claude personal skills directory.
   --all     Install both Codex and Claude targets.
   --force   Replace an existing install target.
@@ -100,8 +100,40 @@ install_target() {
   echo "  target: $target"
 }
 
+install_codex_target() {
+  local source="$repo_root"
+  local target="$codex_home/skills/skillskill"
+
+  mkdir -p "$(dirname "$target")"
+
+  if [[ -e "$target" || -L "$target" ]]; then
+    if [[ "$force" -eq 1 ]]; then
+      rm -rf "$target"
+    else
+      echo "Codex install target already exists: $target" >&2
+      echo "Re-run with --force to replace it." >&2
+      exit 1
+    fi
+  fi
+
+  mkdir -p "$target"
+
+  cp "$source/SKILL.md" "$target/SKILL.md"
+  cp "$source/README.md" "$target/README.md"
+  cp "$source/SkillSkill-SocialMedia.png" "$target/SkillSkill-SocialMedia.png"
+  cp "$source/skillskill_mascot.png" "$target/skillskill_mascot.png"
+
+  cp -R "$source/agents" "$target/agents"
+  cp -R "$source/references" "$target/references"
+  cp -R "$source/scripts" "$target/scripts"
+
+  echo "Codex installed"
+  echo "  source: $source"
+  echo "  target: $target"
+}
+
 if [[ "$install_codex" -eq 1 ]]; then
-  install_target "Codex" "$repo_root" "$codex_home/skills/skillskill"
+  install_codex_target
 fi
 
 if [[ "$install_claude" -eq 1 ]]; then

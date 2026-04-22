@@ -70,7 +70,7 @@ If you use both Codex and Claude personally, install both with:
 
 ### Codex
 
-Use the repo root as the source package. Install into Codex with:
+Install the clean Codex runtime package with:
 
 ```bash
 ./scripts/install.sh --codex
@@ -82,7 +82,8 @@ If you need to replace an existing install target:
 ./scripts/install.sh --codex --force
 ```
 
-The installer symlinks this repo into `${CODEX_HOME:-~/.codex}/skills/skillskill`.
+The installer copies only the runtime package into `${CODEX_HOME:-~/.codex}/skills/skillskill`.
+It intentionally leaves out documentation examples, tests, and the Claude mirror so their nested `SKILL.md` files do not appear as callable Codex skills.
 
 Then invoke it in Codex with `/SkillSkill`, for example:
 
