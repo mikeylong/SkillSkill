@@ -101,10 +101,15 @@ install_target() {
 }
 
 install_codex_target() {
-  local source="$repo_root"
+  local source="$repo_root/packages/codex/skillskill"
   local target="$codex_home/skills/skillskill"
 
   mkdir -p "$(dirname "$target")"
+
+  if [[ ! -d "$source" ]]; then
+    echo "Codex source does not exist: $source" >&2
+    exit 1
+  fi
 
   if [[ -e "$target" || -L "$target" ]]; then
     if [[ "$force" -eq 1 ]]; then
@@ -117,15 +122,7 @@ install_codex_target() {
   fi
 
   mkdir -p "$target"
-
-  cp "$source/SKILL.md" "$target/SKILL.md"
-  cp "$source/README.md" "$target/README.md"
-  cp "$source/SkillSkill-SocialMedia.png" "$target/SkillSkill-SocialMedia.png"
-  cp "$source/skillskill_mascot.png" "$target/skillskill_mascot.png"
-
-  cp -R "$source/agents" "$target/agents"
-  cp -R "$source/references" "$target/references"
-  cp -R "$source/scripts" "$target/scripts"
+  cp -R "$source/." "$target"
 
   echo "Codex installed"
   echo "  source: $source"

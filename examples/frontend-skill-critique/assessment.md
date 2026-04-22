@@ -9,7 +9,7 @@
 ## Packaging Notes
 
 - The rewrite added `Contract`, `Mode Selection`, `Edge Cases`, `Output Shape`, and `Example Requests`.
-- A second pass moved detailed composition and art-direction heuristics into `after/references/visual-playbook.md`, leaving `after/SKILL.md` as the callable core.
+- A second pass moved detailed composition and art-direction heuristics into `after/references/visual-playbook.md`, leaving `after/SKILL.example.md` as the rewritten core snapshot.
 - This example preserves the validated end state of the rewrite, but it remains documentation rather than a second source of truth for the installed skill.
 
 ## Validation

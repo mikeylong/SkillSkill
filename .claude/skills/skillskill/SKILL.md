@@ -1,6 +1,6 @@
 ---
 name: "skillskill"
-description: "Create, revise, or critique agent-readable skill files from workflows, prompts, transcripts, or existing skills. Produces stronger skill packages with precise descriptions, explicit contracts, edge cases, examples, and packaging guidance when needed."
+description: "Create, revise, or critique reusable AI skill packages from workflows, prompts, transcripts, or existing skills, with clear routing, contracts, edge cases, examples, and packaging guidance."
 argument-hint: "[request or path]"
 ---
 
@@ -54,7 +54,7 @@ Specify the expected output format or sections. Write down the edge cases a huma
 If correctness depends on a precise transform, parsing rule, or fragile sequence, recommend or create a script rather than pretending prose will reliably hardwire the behavior.
 
 8. Run a critique pass before finalizing.
-Check the draft against the rubric in [../../../references/rubric.md](../../../references/rubric.md) and the review prompts in [../../../references/review-checklist.md](../../../references/review-checklist.md). Rewrite weak descriptions, vague contracts, missing edge cases, and bloated sections before returning the result.
+Check the draft against the rubric in [../../../packages/codex/skillskill/references/rubric.md](../../../packages/codex/skillskill/references/rubric.md) and the review prompts in [../../../packages/codex/skillskill/references/review-checklist.md](../../../packages/codex/skillskill/references/review-checklist.md). Rewrite weak descriptions, vague contracts, missing edge cases, and bloated sections before returning the result.
 
 ## Authoring Rules
 
@@ -107,4 +107,4 @@ When the caller wants a Codex skill package, produce:
 
 If the caller also wants Claude Code packaging, preserve the same core methodology and only adapt the project-skill path, frontmatter, and description length constraints required by Claude.
 
-When local files are available, validate both canonical and Claude packaging with `python3 scripts/validate_skill.py --expect-codex --expect-claude .`.
+When local files are available, validate both canonical and Claude packaging with `python3 scripts/validate_skill.py --expect-codex --expect-claude packages/codex/skillskill`.

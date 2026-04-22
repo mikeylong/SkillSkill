@@ -2,7 +2,7 @@
 
 Primary request:
 
-> Use `/SkillSkill` to critique the `frontend-skill` in `before/SKILL.md` and rewrite the weak parts.
+> Use `/SkillSkill` to critique the `frontend-skill` in `before/SKILL.example.md` and rewrite the weak parts.
 
 Follow-up request:
 

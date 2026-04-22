@@ -7,9 +7,9 @@ This bundle is documentation only. It is not the canonical source of truth for t
 ## What This Example Contains
 
 - `prompt.md`: the cleaned-up request sequence
-- `before/SKILL.md`: the original skill snapshot that was critiqued
+- `before/SKILL.example.md`: the original skill snapshot that was critiqued
 - `assessment.md`: the critique in SkillSkill terms
-- `after/SKILL.md`: the rewritten core skill snapshot
+- `after/SKILL.example.md`: the rewritten core skill snapshot
 - `after/references/visual-playbook.md`: the extracted reference playbook that keeps the rewritten example self-contained
 
 ## What Changed

@@ -18,9 +18,9 @@ Compared with keeping the workflow as an ad hoc prompt, a skill gives you:
 
 Agent-readable skills, packaged as durable workflow assets.
 
-/SkillSkill is for authoring, packaging, and validating high-quality skill files. Today it ships one skill, `/SkillSkill`, with dual packaging:
+/SkillSkill is for authoring, packaging, and validating high-quality skill files. Today it ships one skill, `/SkillSkill`, with explicit Codex packaging and a Claude Code mirror:
 
-- the repo root is the canonical package for Codex-oriented use
+- `packages/codex/skillskill/` is the canonical package for Codex-oriented use
 - `.claude/skills/skillskill/` is the committed Claude Code mirror
 
 The repo centers on `/SkillSkill`, its supporting references, and the validation workflow that keeps the package consistent across Codex and Claude.
@@ -50,11 +50,12 @@ See [examples/frontend-skill-critique/README.md](examples/frontend-skill-critiqu
 
 ## Package Layout
 
-- `SKILL.md`: canonical skill definition
-- `agents/openai.yaml`: Codex metadata
+- `packages/codex/skillskill/SKILL.md`: canonical Codex skill definition
+- `packages/codex/skillskill/agents/openai.yaml`: Codex metadata
+- `packages/codex/skillskill/references/`: rubric and review checklist used by the skill
+- `packages/codex/skillskill/scripts/validate_skill.py`: validator included with the Codex package
 - `.claude/skills/skillskill/SKILL.md`: Claude project-skill mirror
 - `examples/`: worked documentation bundles showing real critique and rewrite flows
-- `references/`: rubric and review checklist used by the skill
 - `scripts/validate_skill.py`: dependency-free validator for package quality and drift
 - `tests/fixtures/`: valid and intentionally broken fixtures for validator checks
 
@@ -76,14 +77,20 @@ Install the clean Codex runtime package with:
 ./scripts/install.sh --codex
 ```
 
+To install directly from GitHub with the Codex skill installer, use the package path:
+
+```bash
+install-skill-from-github.py --repo mikeylong/SkillSkill --path packages/codex/skillskill --name skillskill
+```
+
 If you need to replace an existing install target:
 
 ```bash
 ./scripts/install.sh --codex --force
 ```
 
-The installer copies only the runtime package into `${CODEX_HOME:-~/.codex}/skills/skillskill`.
-It intentionally leaves out documentation examples, tests, and the Claude mirror so their nested `SKILL.md` files do not appear as callable Codex skills.
+The installer copies only `packages/codex/skillskill` into `${CODEX_HOME:-~/.codex}/skills/skillskill`.
+The repo root is intentionally not installable as a Codex skill, so documentation examples, tests, and the Claude mirror cannot appear as callable Codex skills.
 
 Then invoke it in Codex with `/SkillSkill`, for example:
 
@@ -119,13 +126,13 @@ Example:
 Validate the canonical Codex package:
 
 ```bash
-python3 scripts/validate_skill.py --expect-codex .
+python3 scripts/validate_skill.py --expect-codex packages/codex/skillskill
 ```
 
 Validate both Codex and Claude packaging together:
 
 ```bash
-python3 scripts/validate_skill.py --expect-codex --expect-claude .
+python3 scripts/validate_skill.py --expect-codex --expect-claude packages/codex/skillskill
 ```
 
 The validator checks:
@@ -134,5 +141,6 @@ The validator checks:
 - `name` and `description` frontmatter
 - single-line descriptions
 - contract, output, edge-case, and example guidance
+- nested active `SKILL.md` files inside installable packages
 - Claude description length limits
 - drift between the canonical skill and the Claude mirror
