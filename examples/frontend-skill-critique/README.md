@@ -1,8 +1,8 @@
 # Frontend Skill Critique Example
 
-This example captures a real `skillskill` workflow: critique an existing `frontend-skill`, rewrite the weak parts, and then do a second pass to keep the rewritten skill lean enough to stay callable.
+The example captures a real `$skillskill` workflow: critique an existing `frontend-skill`, rewrite the weak parts, and then do a second pass to keep the rewritten skill lean enough to stay callable.
 
-This bundle is documentation only. It is not the canonical source of truth for the live `frontend-skill` under `~/.codex/skills/frontend-skill/`.
+The bundle is documentation only and is not the canonical source of truth for the live `frontend-skill` under `~/.codex/skills/frontend-skill/`.
 
 ## What This Example Contains
 

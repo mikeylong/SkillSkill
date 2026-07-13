@@ -1,0 +1,238 @@
+{
+  "version": 1,
+  "protocol": {
+    "routing": "Give a fresh agent only the prompt and available skill catalog. Record selection before revealing the expected result.",
+    "execution": "Give a fresh agent the prompt and target artifacts, then score every required gate from observable output or file changes.",
+    "comparison": "For substantial revisions, compare no-skill, current-skill, and candidate-skill runs on the same representative cases."
+  },
+  "routing_cases": [
+    {
+      "id": "route-direct-01",
+      "category": "direct_positive",
+      "prompt": "Use $skillskill to audit the skill package in ./skills/research-review.",
+      "expected": "trigger",
+      "required_gates": ["select_skillskill", "audit_mode"]
+    },
+    {
+      "id": "route-direct-02",
+      "category": "direct_positive",
+      "prompt": "Run SkillSkill against this SKILL.md and identify routing weaknesses.",
+      "expected": "trigger",
+      "required_gates": ["select_skillskill", "evidence_backed_findings"]
+    },
+    {
+      "id": "route-direct-03",
+      "category": "direct_positive",
+      "prompt": "With $skillskill, benchmark the current and proposed versions using fresh-agent prompts.",
+      "expected": "trigger",
+      "required_gates": ["select_skillskill", "behavioral_evaluation"]
+    },
+    {
+      "id": "route-direct-04",
+      "category": "direct_positive",
+      "prompt": "Use SkillSkill to port this existing skill to Codex packaging without changing its core behavior.",
+      "expected": "trigger",
+      "required_gates": ["select_skillskill", "port_mode"]
+    },
+    {
+      "id": "route-direct-05",
+      "category": "direct_positive",
+      "prompt": "Use $skillskill to revise the weak contract and edge cases in this package.",
+      "expected": "trigger",
+      "required_gates": ["select_skillskill", "revise_mode"]
+    },
+    {
+      "id": "route-implicit-01",
+      "category": "implicit_positive",
+      "prompt": "Audit this existing agent skill for over-triggering, under-triggering, stale metadata, and broken package references.",
+      "expected": "trigger",
+      "required_gates": ["select_skillskill", "audit_mode"]
+    },
+    {
+      "id": "route-implicit-02",
+      "category": "implicit_positive",
+      "prompt": "Evaluate whether this SKILL.md actually improves agent behavior, and design a regression basket.",
+      "expected": "trigger",
+      "required_gates": ["select_skillskill", "behavioral_evaluation"]
+    },
+    {
+      "id": "route-implicit-03",
+      "category": "implicit_positive",
+      "prompt": "Compare these two revisions of a reusable skill and recommend the safer one with evidence.",
+      "expected": "trigger",
+      "required_gates": ["select_skillskill", "compare_revisions"]
+    },
+    {
+      "id": "route-implicit-04",
+      "category": "implicit_positive",
+      "prompt": "The skill only works when users say its exact name. Diagnose the routing boundary and rewrite only what is necessary.",
+      "expected": "trigger",
+      "required_gates": ["select_skillskill", "routing_diagnosis"]
+    },
+    {
+      "id": "route-implicit-05",
+      "category": "implicit_positive",
+      "prompt": "Validate this installed skill against current Codex frontmatter and agents/openai.yaml conventions.",
+      "expected": "trigger",
+      "required_gates": ["select_skillskill", "package_validation"]
+    },
+    {
+      "id": "route-negative-01",
+      "category": "near_negative",
+      "prompt": "Create a brand-new weather skill from scratch using the platform's standard scaffolder.",
+      "expected": "do_not_trigger",
+      "required_gates": ["prefer_native_skill_creator"]
+    },
+    {
+      "id": "route-negative-02",
+      "category": "near_negative",
+      "prompt": "Rewrite this weekly update so it sounds like me.",
+      "expected": "do_not_trigger",
+      "required_gates": ["route_to_voice_writing_skill"]
+    },
+    {
+      "id": "route-negative-03",
+      "category": "near_negative",
+      "prompt": "Install the PDF skill from a GitHub repository into my Codex home.",
+      "expected": "do_not_trigger",
+      "required_gates": ["route_to_skill_installer"]
+    },
+    {
+      "id": "route-negative-04",
+      "category": "near_negative",
+      "prompt": "Explain how Codex skills are discovered and invoked.",
+      "expected": "do_not_trigger",
+      "required_gates": ["answer_documentation_question"]
+    },
+    {
+      "id": "route-negative-05",
+      "category": "near_negative",
+      "prompt": "Review this Python validation script for security bugs.",
+      "expected": "do_not_trigger",
+      "required_gates": ["perform_code_review"]
+    },
+    {
+      "id": "route-negative-06",
+      "category": "near_negative",
+      "prompt": "Create a Codex plugin that bundles an MCP server and three existing skills.",
+      "expected": "do_not_trigger",
+      "required_gates": ["route_to_plugin_creator"]
+    },
+    {
+      "id": "route-boundary-01",
+      "category": "ambiguous_boundary",
+      "prompt": "Make this prompt reusable across the team.",
+      "expected": "conditional",
+      "required_gates": ["confirm_skill_artifact_scope", "avoid_unrequested_packaging"]
+    },
+    {
+      "id": "route-boundary-02",
+      "category": "ambiguous_boundary",
+      "prompt": "Improve these agent instructions.",
+      "expected": "conditional",
+      "required_gates": ["inspect_for_existing_skill_package", "avoid_unrequested_edits"]
+    },
+    {
+      "id": "route-boundary-03",
+      "category": "ambiguous_boundary",
+      "prompt": "Turn this repeated workflow into something agents can follow.",
+      "expected": "conditional",
+      "required_gates": ["distinguish_skill_from_local_instructions", "choose_bounded_artifact"]
+    },
+    {
+      "id": "route-boundary-04",
+      "category": "ambiguous_boundary",
+      "prompt": "This agent workflow has become unreliable after several edits. Help me fix it.",
+      "expected": "conditional",
+      "required_gates": ["locate_skill_or_prompt_artifact", "select_skillskill_only_for_skill_package"]
+    },
+    {
+      "id": "route-collision-01",
+      "category": "collision",
+      "prompt": "Scaffold a new Codex skill and generate its standard metadata files.",
+      "expected": "do_not_trigger",
+      "required_gates": ["prefer_native_skill_creator"]
+    },
+    {
+      "id": "route-collision-02",
+      "category": "collision",
+      "prompt": "Create a reusable personal artifact-template skill from this finished report.",
+      "expected": "do_not_trigger",
+      "required_gates": ["route_to_template_creator"]
+    },
+    {
+      "id": "route-collision-03",
+      "category": "collision",
+      "prompt": "Audit the prose in this skill so every sentence matches my writing voice.",
+      "expected": "conditional",
+      "required_gates": ["combine_skill_audit_and_voice_skill", "preserve_author_voice"]
+    },
+    {
+      "id": "route-collision-04",
+      "category": "collision",
+      "prompt": "Fix this existing skill's broken Codex metadata, then install it locally.",
+      "expected": "trigger",
+      "required_gates": ["select_skillskill_for_repair", "use_install_workflow_after_validation"]
+    }
+  ],
+  "required_execution_gates": {
+    "create_from_workflow": ["complete_skill_artifact", "explicit_contract", "edge_cases", "pattern_anchor"],
+    "incomplete_or_overbroad": ["states_assumptions", "narrows_repeatable_job"],
+    "audit_only_no_edit": ["read_only", "evidence_backed_findings", "no_rewrite_required"],
+    "critique_or_revise": ["diagnoses_high_impact_issues", "targeted_replacements", "verifies_revision"],
+    "preserve_conventions": ["preserves_existing_conventions", "changes_only_blockers"],
+    "platform_unspecified": ["portable_core", "no_platform_specific_metadata"],
+    "current_codex_packaging": ["codex_frontmatter_valid", "openai_yaml_valid", "dollar_skill_prompt", "static_validation"],
+    "deterministic_script_boundary": ["identifies_deterministic_step", "uses_or_recommends_script", "does_not_overpromise_prose"]
+  },
+  "execution_cases": [
+    {
+      "id": "exec-create-01",
+      "category": "create_from_workflow",
+      "prompt": "Use $skillskill with the platform-native creator to turn the supplied incident-handoff workflow into a complete reusable skill package.",
+      "required_gates": ["complete_skill_artifact", "explicit_contract", "edge_cases", "pattern_anchor"]
+    },
+    {
+      "id": "exec-scope-01",
+      "category": "incomplete_or_overbroad",
+      "prompt": "Use $skillskill to assess and narrow this request: make one skill that handles every kind of project management from these partial notes.",
+      "required_gates": ["states_assumptions", "narrows_repeatable_job"]
+    },
+    {
+      "id": "exec-audit-01",
+      "category": "audit_only_no_edit",
+      "prompt": "Audit this package and report findings only. Do not change or rewrite files.",
+      "required_gates": ["read_only", "evidence_backed_findings", "no_rewrite_required"]
+    },
+    {
+      "id": "exec-revise-01",
+      "category": "critique_or_revise",
+      "prompt": "Diagnose the weak sections, revise only those sections, and verify the result.",
+      "required_gates": ["diagnoses_high_impact_issues", "targeted_replacements", "verifies_revision"]
+    },
+    {
+      "id": "exec-preserve-01",
+      "category": "preserve_conventions",
+      "prompt": "Repair this established package while preserving its names, layout, and working conventions.",
+      "required_gates": ["preserves_existing_conventions", "changes_only_blockers"]
+    },
+    {
+      "id": "exec-portable-01",
+      "category": "platform_unspecified",
+      "prompt": "Use $skillskill to draft the core skill with the native creator, but I have not chosen an agent platform yet.",
+      "required_gates": ["portable_core", "no_platform_specific_metadata"]
+    },
+    {
+      "id": "exec-codex-01",
+      "category": "current_codex_packaging",
+      "prompt": "Package this audited skill for current Codex and run its static checks.",
+      "required_gates": ["codex_frontmatter_valid", "openai_yaml_valid", "dollar_skill_prompt", "static_validation"]
+    },
+    {
+      "id": "exec-script-01",
+      "category": "deterministic_script_boundary",
+      "prompt": "Audit this existing skill: it must normalize identifiers and reject malformed metadata identically every time.",
+      "required_gates": ["identifies_deterministic_step", "uses_or_recommends_script", "does_not_overpromise_prose"]
+    }
+  ]
+}

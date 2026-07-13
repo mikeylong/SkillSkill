@@ -10,8 +10,8 @@
 
 - The rewrite added `Contract`, `Mode Selection`, `Edge Cases`, `Output Shape`, and `Example Requests`.
 - A second pass moved detailed composition and art-direction heuristics into `after/references/visual-playbook.md`, leaving `after/SKILL.example.md` as the rewritten core snapshot.
-- This example preserves the validated end state of the rewrite, but it remains documentation rather than a second source of truth for the installed skill.
+- The example preserves the final split-package shape, but it remains documentation rather than a second source of truth for the installed skill.
 
-## Validation
+## Validation Boundary
 
-- During the original rewrite, the final split package shape validated cleanly after the core skill was reduced and the visual heuristics were moved into a reference file.
+- This frozen bundle documents the rewrite. Its files use `.example.md` names, so the repository's package validator does not treat it as an installable skill.

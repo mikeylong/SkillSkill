@@ -1,146 +1,131 @@
-<p align="center"><img src="./skillskill_mascot.png" alt="/SkillSkill mascot" width="560"></p>
+<p align="center"><img src="./skillskill_mascot.png" alt="SkillSkill mascot" width="560"></p>
 
-`/SkillSkill` is useful when a team has already figured out a workflow in one good AI session and wants to make it reusable. For example, imagine an engineer who spends 25 minutes teaching an assistant how to turn a week of merged PRs into release notes. The good result depends on lots of tacit instructions: group changes by feature, separate customer-facing updates from internal chores, call out migrations or risky changes, ignore reverted work, and end with a short QA checklist. `/SkillSkill` takes that successful chat and turns it into a real skill package with a clear trigger description, an output contract, edge cases, and examples. The next time someone asks for release notes, the agent can route to the skill instead of being retaught from scratch.
+# SkillSkill
 
-> Use `/SkillSkill` to turn this release-notes workflow into a reusable skill. The skill should trigger when someone wants release notes from merged PRs, group changes by feature, separate customer-facing notes from internal chores, call out migrations and risky changes, ignore reverted work, and end with a short QA checklist.
+SkillSkill audits and improves agent-readable skill packages. Use it when a skill routes poorly, has a vague contract, mixes platform packaging with core behavior, or needs evidence-backed revision and regression coverage.
 
-The result would be a reusable skill package that tells the agent when to use this workflow, what output to produce, and which edge cases to handle.
+SkillSkill is strongest as the review layer around a platform's native skill creator. Let the native creator handle routine scaffolding. Use SkillSkill for deeper audits, targeted revisions, cross-platform ports, and behavioral evaluation.
 
-Compared with keeping the workflow as an ad hoc prompt, a skill gives you:
+Example:
 
-- Sharper routing: it's clearer when the skill should be invoked.
-- Explicit contracts: it defines what the skill should return.
-- Clearer workflow: it gives a more disciplined authoring process.
-- Better edge-case coverage: it handles messy or ambiguous inputs more reliably.
-- Cleaner separation of core behavior from platform-specific details: the method stays general instead of being tangled with one tool's packaging.
+> `$skillskill audit this release-notes skill. Check routing, output contracts, edge cases, packaging, and forward-test coverage. Keep the audit read-only.`
 
-# /SkillSkill
+The result should identify the highest-impact problems, cite the relevant files or sections, and propose concrete replacements. SkillSkill only edits files when the request authorizes changes.
 
-Agent-readable skills, packaged as durable workflow assets.
+## What It Does
 
-/SkillSkill is for authoring, packaging, and validating high-quality skill files. Today it ships one skill, `/SkillSkill`, with explicit Codex packaging and a Claude Code mirror:
+SkillSkill supports four modes:
 
-- `packages/codex/skillskill/` is the canonical package for Codex-oriented use
-- `.claude/skills/skillskill/` is the committed Claude Code mirror
+- `Audit`: inspect an existing skill and return evidence-backed findings. Audit is the read-only default.
+- `Evaluate / Benchmark`: test routing and execution behavior. Keep the package read-only; write only to authorized, isolated fixtures.
+- `Revise / Implement`: make scoped edits to the requested package, preserve working conventions, and verify the result.
+- `Port`: adapt the requested package or adapter for another platform while preserving the canonical contract.
 
-The repo centers on `/SkillSkill`, its supporting references, and the validation workflow that keeps the package consistent across Codex and Claude.
+Typical requests:
 
-## What `/SkillSkill` Does
+- `$skillskill audit this SKILL.md for routing and contract problems.`
+- `$skillskill revise this package and validate every callable copy.`
+- `$skillskill port this skill to Codex and Claude without duplicating the core methodology.`
+- `$skillskill benchmark the current and proposed versions against the forward-test basket.`
 
-`/SkillSkill` helps an AI:
+## Canonical Package And Project Adapters
 
-- create a new skill from a workflow, prompt, transcript, or notes
-- revise an existing skill so it routes and performs better
-- critique a skill against a clear rubric and rewrite weak parts
-- package the result for Codex when the request is Codex-specific
+[`packages/codex/skillskill/`](packages/codex/skillskill/) is the single canonical, cross-compatible package.
 
-The methodology stays cross-tool by default. Packaging details are added only when the caller asks for a specific platform.
+The project-local adapters point to that package with tracked relative symlinks:
 
-## Example Requests
+- `.agents/skills/skillskill` → `../../packages/codex/skillskill`
+- `.claude/skills/skillskill` → `../../packages/codex/skillskill`
 
-- `Turn this workflow into a skill.`
-- `Use this transcript to draft a reusable skill package.`
-- `Use this prompt to create a skill.`
-- `Critique this SKILL.md and rewrite weak parts.`
-- `Revise this skill for Claude and Codex.`
+The symlinks keep Codex and Claude project discovery on the same files. No generated mirror can drift.
 
-## Worked Example
+Personal installs work differently. [`scripts/install.sh`](scripts/install.sh) validates the canonical source, stages a copy beside the destination, and then installs a stable copy. The personal Codex or Claude install does not depend on the checkout remaining in place.
 
-See [examples/frontend-skill-critique/README.md](examples/frontend-skill-critique/README.md) for a complete before-and-after example of using `/SkillSkill` to critique and rewrite an existing skill.
+## Install
 
-## Package Layout
+### From A Local Clone
 
-- `packages/codex/skillskill/SKILL.md`: canonical Codex skill definition
-- `packages/codex/skillskill/agents/openai.yaml`: Codex metadata
-- `packages/codex/skillskill/references/`: rubric and review checklist used by the skill
-- `packages/codex/skillskill/scripts/validate_skill.py`: validator included with the Codex package
-- `.claude/skills/skillskill/SKILL.md`: Claude project-skill mirror
-- `examples/`: worked documentation bundles showing real critique and rewrite flows
-- `scripts/validate_skill.py`: dependency-free validator for package quality and drift
-- `tests/fixtures/`: valid and intentionally broken fixtures for validator checks
-
-## How To Use
-
-### Both Tools
-
-If you use both Codex and Claude personally, install both with:
-
-```bash
-./scripts/install.sh --all
-```
-
-### Codex
-
-Install the clean Codex runtime package with:
+Install for Codex:
 
 ```bash
 ./scripts/install.sh --codex
 ```
 
-To install directly from GitHub with the Codex skill installer, use the package path:
-
-```bash
-install-skill-from-github.py --repo mikeylong/SkillSkill --path packages/codex/skillskill --name skillskill
-```
-
-If you need to replace an existing install target:
-
-```bash
-./scripts/install.sh --codex --force
-```
-
-The installer copies only `packages/codex/skillskill` into `${CODEX_HOME:-~/.codex}/skills/skillskill`.
-The repo root is intentionally not installable as a Codex skill, so documentation examples, tests, and the Claude mirror cannot appear as callable Codex skills.
-
-Then invoke it in Codex with `/SkillSkill`, for example:
-
-- `/SkillSkill turn this workflow into a skill.`
-- `/SkillSkill review this SKILL.md and rewrite weak parts.`
-
-### Claude Code
-
-This repo already contains a project-local Claude skill at `.claude/skills/skillskill/`, so anyone who opens this repo in Claude Code can use it in that workspace immediately.
-
-If you also want a personal Claude install across all projects, run:
+Install for Claude:
 
 ```bash
 ./scripts/install.sh --claude
 ```
 
-That symlinks the committed Claude mirror into `${CLAUDE_HOME:-~/.claude}/skills/skillskill`.
-
-From this workspace Claude Code can use it automatically when relevant or you can invoke it directly with:
-
-```text
-/SkillSkill
-```
-
-Example:
-
-```text
-/SkillSkill turn this transcript into a reusable skill
-```
-
-## Validation
-
-Validate the canonical Codex package:
+Install both:
 
 ```bash
-python3 scripts/validate_skill.py --expect-codex packages/codex/skillskill
+./scripts/install.sh --all
 ```
 
-Validate both Codex and Claude packaging together:
+Existing targets are left untouched unless `--force` is explicit:
 
 ```bash
-python3 scripts/validate_skill.py --expect-codex --expect-claude packages/codex/skillskill
+./scripts/install.sh --all --force
 ```
 
-The validator checks:
+The destinations are:
 
-- required package files
-- `name` and `description` frontmatter
-- single-line descriptions
-- contract, output, edge-case, and example guidance
-- nested active `SKILL.md` files inside installable packages
-- Claude description length limits
-- drift between the canonical skill and the Claude mirror
+- Codex: `${CODEX_HOME:-$HOME/.codex}/skills/skillskill`
+- Claude: `${CLAUDE_HOME:-$HOME/.claude}/skills/skillskill`
+
+### From GitHub In Codex
+
+Ask the built-in installer to install the canonical package path:
+
+```text
+$skill-installer install https://github.com/mikeylong/SkillSkill/tree/main/packages/codex/skillskill
+```
+
+The package is available to a new Codex turn after installation.
+
+## Use
+
+Codex can select the skill from a matching request, or you can name it directly:
+
+```text
+$skillskill evaluate this skill against the routing and execution cases
+```
+
+In this repository, Codex and Claude discover the same canonical package through their project adapters.
+
+## Validation And Tests
+
+Run strict static validation from the repository root:
+
+```bash
+python3 scripts/validate_skill.py --expect-codex --expect-claude --strict-quality packages/codex/skillskill
+```
+
+Static validation checks deterministic rules for package structure, frontmatter, Codex metadata, local links, and required quality sections. A `STATIC PASS` means those checks passed, but does not prove that a model will route to the skill or follow it correctly.
+
+Run the repository tests with:
+
+```bash
+python3 -m unittest discover -s tests -p 'test_*.py'
+```
+
+The test suite covers validator behavior, project-adapter topology, package hygiene, and the versioned evaluation manifest. The [forward-test basket](tests/evals/skillskill_behavior_cases.json) contains routing and execution cases for fresh-agent comparison. Manifest tests check the case schema and expected inventory; they do not run a model or produce an automated quality score. Use the [evaluation protocol](packages/codex/skillskill/references/evaluation.md) when measuring behavior.
+
+## Worked Example
+
+[`examples/frontend-skill-critique/`](examples/frontend-skill-critique/) contains a frozen before-and-after critique. It shows how SkillSkill tightens routing, adds a concrete contract and edge cases, and moves long guidance into a reference file.
+
+## Repository Layout
+
+- `packages/codex/skillskill/SKILL.md`: canonical methodology and behavior
+- `packages/codex/skillskill/agents/openai.yaml`: Codex UI metadata
+- `packages/codex/skillskill/assets/`: runtime icons
+- `packages/codex/skillskill/references/`: scored audit rubric and evaluation protocol
+- `packages/codex/skillskill/scripts/validate_skill.py`: validator shipped with the package
+- `.agents/skills/skillskill`: Codex-compatible project adapter
+- `.claude/skills/skillskill`: Claude project adapter
+- `scripts/install.sh`: validated personal-copy installer
+- `scripts/validate_skill.py`: repository validator
+- `tests/`: validator tests and behavioral evaluation fixtures
+- `examples/`: worked documentation bundles

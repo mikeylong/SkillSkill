@@ -1,96 +1,120 @@
-# Agent Readability Rubric
+# Scored Skill Audit Rubric
 
-Use this rubric to draft or critique skills. The goal is not to make the longest skill. The goal is to make the most callable and dependable one.
+Use this rubric for audits, revisions, ports, and release reviews. Score the package that actually runs, then note source-package differences separately.
 
-## 1. Description Quality
+## Scoring
 
-A strong description:
+Rate each dimension from 0 to 4:
 
-- stays on a single line
-- acts as a routing signal, not a label
-- names the artifact, document, or output produced
-- includes realistic trigger language from user requests
-- makes the use case specific enough to call confidently
+- **0 — Absent or invalid:** The capability is missing, broken, or contradicted.
+- **1 — Material weakness:** Common cases fail or require substantial agent guesswork.
+- **2 — Partial:** The intent is visible, but important cases remain unreliable.
+- **3 — Solid:** The package handles normal use with minor, bounded gaps.
+- **4 — Release quality:** Evidence demonstrates clear, dependable behavior across boundaries and edge cases.
 
-A weak description:
+Calculate weighted points as `rating / 4 × weight`. Use `Not tested`, not a guessed rating, when behavioral evidence is unavailable; do not claim release readiness with an untested release gate. Use `N/A` only when a dimension truly cannot apply and explain why.
 
-- is vague, generic, or aspirational
-- says it "helps with" a broad domain
-- omits the output shape
-- can match unrelated requests
+| Dimension | Weight |
+| --- | ---: |
+| Routing metadata and boundaries | 15 |
+| Contract and output | 10 |
+| Reasoning and authority | 10 |
+| Edge cases, fallback, and safety | 10 |
+| Capability fit and composition | 10 |
+| Runtime provenance and source of truth | 10 |
+| Progressive disclosure and resources | 10 |
+| Platform-native packaging | 5 |
+| Static integrity | 5 |
+| Behavioral evidence and regression safety | 15 |
 
-## 2. Reasoning Over Rote Steps
+Interpret totals only when every required dimension has evidence:
 
-The body should teach the model how to think in the workflow, not just what order to click things in.
+- **90–100:** Release-ready, provided all release gates pass and no High finding remains.
+- **75–89:** Strong but remediation remains.
+- **50–74:** Not release-ready; material gaps remain.
+- **Below 50:** Redesign or substantial repair is warranted.
 
-Include:
+## Dimension Checks
 
-- decision principles
-- quality criteria
-- how to resolve common ambiguity
-- when to stay flexible versus when to be strict
+### Routing Metadata And Boundaries
 
-Avoid pure linear procedure unless the task is fragile enough that it should become a script.
+- Keep the description on one line and within platform limits.
+- Name concrete audit or execution contexts using realistic user language.
+- Cover positive triggers, paraphrases, implicit cases, explicit invocation, nearest competitors, and must-not-trigger cases.
+- Avoid broad language that captures ordinary work owned by native or specialist skills.
+- Place all routing information in metadata available before the body loads.
 
-## 3. Contract Clarity
+### Contract And Output
 
-Every strong skill defines a contract:
+- Define what the skill returns, its stable shape, allowed assumptions, and non-guarantees.
+- Make outputs usable by the next agent or human without reinterpretation.
+- Match the contract to each supported mode; do not require edits from a read-only audit.
 
-- what the skill returns
-- what structure or sections the output should have
-- what assumptions are allowed
-- what the skill does not guarantee
+### Reasoning And Authority
 
-If the contract is fuzzy, agents will call the skill with weak expectations and produce weak handoffs.
+- Teach decision principles, quality criteria, and ambiguity resolution rather than only rote steps.
+- State read/write authority and external side-effect boundaries.
+- Match freedom to task fragility; move exact transforms and brittle sequences into scripts.
 
-## 4. Edge Cases And Examples
+### Edge Cases, Fallback, And Safety
 
-Write down the cases a skilled human would otherwise handle implicitly.
+- Cover missing inputs, ambiguity, unavailable capabilities, conflicting sources, dirty worktrees, and partial failure.
+- State safe fallbacks without promising unavailable behavior.
+- Protect secrets, user data, production systems, and unrelated changes.
 
-Include:
+### Capability Fit And Composition
 
-- missing inputs
-- ambiguous requests
-- competing interpretations
-- failure or fallback behavior
+- Inventory relevant skills, tools, scripts, apps, connectors, MCP capabilities, assets, and dependencies.
+- Distinguish active/discoverable capabilities from documented assumptions.
+- Compose with native or specialist capabilities instead of duplicating them.
+- Keep the package focused on durable, non-obvious workflow knowledge.
 
-Also include one compact example or a pointer to a reference file with a good example. A short example is usually enough to anchor style and structure.
+### Runtime Provenance And Source Of Truth
 
-## 5. Lean Core File
+- Identify the actual discovered runtime package and canonical source.
+- Record adapters, mirrors, generation steps, copies, symlinks, hashes or commits, and drift.
+- Validate the callable variant rather than only a convenient repository copy.
 
-Keep the core skill file lean enough to stay legible and callable.
+### Progressive Disclosure And Resources
 
-- Prefer a concise core file over a sprawling one.
-- Move detailed schemas, domain notes, or long examples into `references/`.
-- Move deterministic transforms or brittle sequences into `scripts/`.
+- Keep the core concise and link each conditional reference directly.
+- Read references completely when their path applies; avoid duplicating guidance between core and references.
+- Keep scripts executable, deterministic, and tested.
+- Use assets only for output resources; remove placeholders, orphans, oversized duplicates, and hidden instructions.
 
-Long skills are not inherently better. Competing instructions degrade reliability.
+### Platform-Native Packaging
 
-## 6. Composability
+- Follow current native naming, frontmatter, metadata, directory, and invocation conventions.
+- Keep generated adapters synchronized with the canonical behavioral contract.
+- Verify UI metadata describes the current skill and points only to existing assets.
 
-Skills should support handoffs.
+### Static Integrity
 
-Ask:
+- Run the authoritative platform validator and every documented command.
+- Check schema, links, paths, metadata constraints, script exits, and package contents.
+- Label custom lint results as static checks; reject keyword-presence checks as evidence of quality.
 
-- Can another agent act on this output without reinterpreting it?
-- Does the skill produce artifacts in a stable enough shape for downstream work?
-- Is the output useful in a larger chain, not just as a one-off response?
+### Behavioral Evidence And Regression Safety
 
-Treat the output as part of a workflow, not as an isolated answer.
+- Test metadata routing independently from body execution.
+- Compare incumbent or no-skill behavior with the candidate on representative tasks.
+- Use fresh agents, clean fixtures, blinded variants, and no leaked diagnosis or expected answer.
+- Capture prompt, artifact, environment, result, score, and evaluator provenance.
+- Include common, boundary, failure, authority, and prior-regression cases.
 
-## 7. Determinism Boundary
+## Finding Priority
 
-Use prose for reasoning. Use scripts for hardwired behavior.
+- **High:** Causes unsafe action, invalid packaging, runtime failure, severe routing error, source/runtime corruption, or failure of a critical release gate.
+- **Medium:** Materially weakens common behavior, composition, maintainability, or confidence but has a bounded workaround.
+- **Low:** Improves clarity, efficiency, consistency, or hygiene without changing core reliability.
 
-When the desired behavior depends on exact parsing, exact formatting, or a fragile sequence, the skill should recommend or include a script instead of overpromising that plain language will be enough.
+Fix High findings first, then routing and contract gaps, authority or safety gaps, runtime drift, behavioral regressions, and package hygiene. Preserve evidence and user changes while revising.
 
-## 8. Testing And Iteration
+## Audit Completion Checklist
 
-High-quality skills are versioned and tested.
-
-- run a basket of representative prompts or tasks
-- compare revisions against prior versions
-- verify trigger quality as well as output quality
-- keep refining weak descriptions and vague contracts
-
-Treat a skill as a compounding workflow asset, not a static prompt.
+- Confirm that the full core and applicable references were read.
+- Confirm that runtime and source were distinguished.
+- Confirm that nearby capabilities and routing negatives were tested.
+- Confirm that static and behavioral results were reported separately.
+- Confirm that each score cites evidence and each unrun check says `Not tested`.
+- Confirm that the report uses High, Medium, and Low labels and honors the selected authority mode.

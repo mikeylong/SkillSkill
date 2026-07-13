@@ -1,109 +1,91 @@
 ---
-name: "skillskill"
-description: "Create, revise, or critique agent-readable skill files from workflows, prompts, transcripts, or existing skills. Produces stronger SKILL.md packages with precise descriptions, explicit contracts, edge cases, examples, and platform-specific packaging when requested."
+name: skillskill
+description: Audit, benchmark, validate, port, and diagnose routing or regressions in existing agent skill packages. Use for skill evaluations, capability-fit reviews, metadata tests, behavioral comparisons, targeted repairs, and release readiness.
 ---
 
 # SkillSkill
 
-Use this skill to turn workflow knowledge into a durable, high-quality skill package, or to repair a weak skill so it routes and performs better for agents.
+Audit existing skill packages and improve them only when authorized. Defer ordinary new-skill scaffolding to the platform-native creator.
 
-Default posture: write a cross-tool skill first, then adapt packaging details only when the caller explicitly names a platform such as Codex or Claude Code.
+## Modes And Authority
 
-## Trigger Cases
+- **Audit:** Stay read-only. Inspect the package and return evidence-backed findings without rewriting files.
+- **Evaluate:** Stay read-only except for explicitly authorized, isolated fixtures. Benchmark routing and execution without changing the source package.
+- **Revise or implement:** Edit only the package and findings placed in scope. Preserve unrelated files, conventions, and user changes.
+- **Port:** Change only the requested target package or adapter. Preserve the canonical behavioral contract unless the user requests a redesign.
+- Never infer write authority from requests to audit, review, diagnose, benchmark, or validate.
 
-Use this skill when the user asks to:
-
-- create a skill
-- rewrite or refactor a skill
-- review a skill for agent readability
-- turn a workflow, prompt, notes set, or transcript into a skill
-- diagnose why a skill under-triggers, over-triggers, or produces weak outputs
-
-## Contract
-
-Return concrete rewritten artifacts, not only advice.
-
-- `Create`: return a complete new skill draft, any supporting-file recommendations, and a short quality review against the rubric.
-- `Revise`: return a rewritten skill file or rewritten sections, a short note on what changed, and any packaging updates required.
-- `Critique`: return `Assessment`, `Rewritten Skill`, and `Packaging Notes` when packaging changes are needed.
-
-If the caller asked for file edits, update the files directly instead of only describing changes.
+When the user explicitly invokes `$skillskill` to create a new skill, compose with the platform-native skill creator. Let the native creator own scaffolding and current packaging; use SkillSkill to sharpen boundaries, audit the result, and design evaluation. If no native creator is available, state the fallback before proceeding.
 
 ## Workflow
 
-1. Classify the skill.
-Determine whether it is a standard skill, a methodology skill, or a personal workflow skill. Identify the likely caller, audience, and where the skill should live.
+### 1. Establish The Execution Surface
 
-2. Extract the operating intent.
-Pull out the repeated workflow, the target outcome, the artifacts produced, and the trigger phrases an agent is likely to see in real requests.
+- Identify the skill package actually discovered at runtime before judging a repository copy.
+- Resolve the canonical source, installed copy, generated mirrors, adapters, and copy-versus-symlink relationship. Record paths, versions or hashes, and drift when available.
+- Read each target `SKILL.md` completely. Read every directly required reference completely; for conditional references, read all files governing the paths under test and record any skipped material.
+- Inspect repository and installed-package state separately. Do not assume the edited source is the active runtime.
 
-3. Write the description first.
-Treat the description as a routing signal, not a label. Keep it on one line. Name the output or artifact, include trigger-style language, and make the use case concrete enough that the agent can confidently choose it.
+### 2. Inventory And Compose Capabilities
 
-4. Draft the body around reasoning.
-Do not write only a brittle checklist. Include the principles, quality bar, and decision logic that let the model generalize when inputs vary.
+- Inventory available skills, tools, scripts, apps, connectors, MCP servers or resources, assets, and runtime dependencies.
+- Distinguish discoverable capabilities from merely documented or installed ones.
+- Find platform-native or specialist capabilities that overlap the package. Compose with them instead of duplicating their generic behavior.
+- Verify fallback behavior when a required capability is absent, unavailable, or unauthorized.
 
-5. Define the output contract.
-State what the skill produces, what shape the output should take, what it is allowed to assume, and what it does not promise. Skills should feel closer to an API contract than a motivational prompt.
+### 3. Audit Behavior And Boundaries
 
-6. Add output guidance, edge cases, and an example.
-Specify the expected output format or sections. Write down the edge cases a human would otherwise silently handle. Include one compact example or point to a reference file with good examples.
+- Treat frontmatter descriptions and registry metadata as the routing surface; do not rely on body-only trigger guidance.
+- Check positive triggers, must-not-trigger cases, nearest competing skills, explicit invocation, under-triggering, and over-triggering.
+- Check the contract, output shape, authority boundaries, reasoning guidance, edge cases, fallback behavior, examples, and handoff quality.
+- Separate deterministic behavior that belongs in scripts from judgment that belongs in prose.
 
-7. Split deterministic work out of prose when needed.
-If correctness depends on a precise transform, parsing rule, or fragile sequence, recommend or create a script rather than pretending prose will reliably hardwire the behavior.
+### 4. Inspect Disclosure And Packaging
 
-8. Run a critique pass before finalizing.
-Check the draft against the rubric in [references/rubric.md](references/rubric.md) and the review prompts in [references/review-checklist.md](references/review-checklist.md). Rewrite weak descriptions, vague contracts, missing edge cases, and bloated sections before returning the result.
+- Keep the core file lean. Link references directly and load detail only for the applicable path.
+- Verify that scripts are deterministic and tested, references are instruction-bearing and reachable, and assets are output resources rather than hidden instructions.
+- Flag broken links, orphaned resources, duplicated guidance, oversized or unreferenced assets, and competing sources of truth.
+- Follow the target platform's native naming, frontmatter, metadata, folder, and validation rules. Regenerate platform adapters from the canonical contract when practical.
 
-## Authoring Rules
+### 5. Validate At Two Levels
 
-- Keep the core skill lean. Prefer a tight core file with references over a long monolith with competing instructions.
-- Prefer behavior-level guidance over excessive exposition. The model already knows basic writing mechanics.
-- Make outputs handoff-ready. A downstream agent or human should be able to use the result without reinterpreting the skill's intent.
-- Preserve existing conventions when revising an established skill unless the caller asks for a rework.
-- If the request is platform-specific, add only the packaging details that platform actually needs.
-- If the skill will be reused heavily by agents, recommend a validator path or a small basket of representative prompts so revisions can be compared over time.
+- Run authoritative platform validators and every documented command against the actual callable variant.
+- Label schema, link, command, and package checks as **static validation**. Never present a keyword scan or custom linter as proof of behavioral quality.
+- Run metadata-only routing tests and fresh-agent execution comparisons for consequential revisions. Compare no-skill or incumbent behavior with the candidate when practical.
+- Give forward-test agents raw user tasks and clean fixtures. Do not leak the suspected defect, intended fix, expected answer, prior output, or scoring conclusion.
+- Use isolated workspaces for tests that write files. Do not exercise live production systems without explicit authority.
+- Follow [references/evaluation.md](references/evaluation.md) for prompt baskets, provenance, gates, and A/B procedure.
+
+### 6. Score And Report
+
+- Read [references/rubric.md](references/rubric.md) completely and score only supported evidence.
+- Lead with a verdict. Report findings under `High`, `Medium`, and `Low`; do not use P-number labels.
+- Cite concrete paths, metadata, commands, outputs, or trial artifacts for each material finding.
+- Separate runtime drift, static results, behavioral results, implemented changes, and limitations.
+- Do not force a rewrite in Audit or Evaluate mode. Offer targeted replacement text only when it clarifies a finding; edit files only in an authorized write mode.
 
 ## Edge Cases
 
-- If the source material is incomplete, state the assumptions you are making before drafting the skill.
-- If the workflow is too broad, narrow it to one repeatable job instead of writing a vague catch-all skill.
-- If the platform is unspecified, avoid inventing tool-specific frontmatter rules or metadata fields.
-- If the package already exists, preserve naming and structural conventions unless they block routing clarity or output quality.
-- If the desired behavior is fundamentally deterministic, recommend a script or supporting tool instead of overpromising with prose.
+- When multiple active copies disagree, identify the discovered runtime, map the drift, and avoid overwriting either copy until the source of truth is established.
+- When the platform is unspecified, audit the platform-neutral contract and observed runtime; do not invent packaging rules.
+- When clean-agent evaluation is unavailable, preserve a runnable prompt basket and mark behavioral checks `Not tested`.
+- When static checks pass but behavior remains untested, report `Static: Pass` and `Behavioral: Not tested`; do not claim release readiness.
 
 ## Example Requests
 
-- `Turn this meeting-synthesis workflow into a reusable skill.`
-- `Critique this SKILL.md and rewrite weak parts.`
-- `Use this transcript to draft a skill, then package it for Codex.`
+- `Use $skillskill to audit this installed skill against its repository source and diagnose routing drift.`
+- `Use $skillskill to evaluate this revision with metadata-only routing tests and fresh-agent A/B tasks.`
+- `Use $skillskill to port this skill to Codex while preserving its behavioral contract and validating the adapter.`
 
-## Review Mode
+## Output Contract
 
-When the input already contains a skill, do not stop at abstract critique. Rewrite the weak parts and return:
+Return the smallest handoff-ready report that covers:
 
-1. `Assessment`: 2-5 bullets on the highest-impact issues.
-2. `Rewritten Skill`: the improved `SKILL.md` or the changed sections.
-3. `Packaging Notes`: only when the skill needs references, scripts, or platform-specific metadata.
+1. `Verdict` and scored readiness
+2. `Runtime And Source Map`
+3. `High`, `Medium`, and `Low` findings with evidence
+4. `Static Validation` and `Behavioral Evaluation` as separate sections
+5. `Changes` only when authorized
+6. `Limitations` and the next release gate
 
-Prioritize:
-
-- vague or broad descriptions
-- missing contract or output shape
-- absent edge cases
-- no example or pattern anchor
-- instructions that should be moved into a script or reference
-- bloated core files that should be shortened
-
-## Codex Packaging
-
-When the caller wants a Codex skill package, produce:
-
-- `SKILL.md`
-- `agents/openai.yaml` with concise UI metadata
-- `references/` only when extra detail materially improves the skill
-- `scripts/` only for deterministic behavior or validation
-
-If the caller also wants Claude Code packaging, preserve the same core methodology and only adapt the project-skill path, frontmatter, and description length constraints required by Claude.
-
-If local files are available, validate Codex-oriented packages with `python3 scripts/validate_skill.py <skill-dir>` before finishing.
+Mark unrun checks as `Not tested`. Never infer a pass from missing evidence.
