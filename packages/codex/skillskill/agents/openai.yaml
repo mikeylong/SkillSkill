@@ -1,4 +1,6 @@
 interface:
   display_name: "SkillSkill"
-  short_description: "Author and critique skill files"
-  default_prompt: "Use /skillskill to draft, revise, or critique an agent-readable skill from this workflow."
+  short_description: "Audit and benchmark agent skill packages"
+  icon_small: "./assets/skillskill-mascot-400.png"
+  icon_large: "./assets/skillskill-mascot.png"
+  default_prompt: "Use $skillskill to audit this skill package, diagnose routing and regressions, and recommend evidence-backed improvements."

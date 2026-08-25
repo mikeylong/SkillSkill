@@ -1,20 +1,86 @@
 #!/usr/bin/env python3
-"""Validate basic quality and packaging rules for a skill directory."""
+"""Run static checks on one or more skill packages."""
 
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+from urllib.parse import unquote, urlsplit
+
+try:
+    import yaml
+except ImportError:  # pragma: no cover - exercised through the fail-closed branch
+    yaml = None
 
 
-FRONTMATTER_RE = re.compile(r"\A---\n(.*?)\n---\n?", re.DOTALL)
-SCALAR_RE = re.compile(r"^(name|description):\s*(.+?)\s*$")
+FRONTMATTER_RE = re.compile(r"\A---[ \t]*\n(.*?)\n---[ \t]*(?:\n|\Z)", re.DOTALL)
+TOP_LEVEL_KEY_RE = re.compile(r"^([A-Za-z][A-Za-z0-9_-]*):(?:[ \t]*(.*))?$")
+NAME_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+NUMBER_RE = re.compile(r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?\Z")
+MARKDOWN_LINK_RE = re.compile(r"!?\[[^\]\n]*\]\(([^)\n]+)\)")
+REFERENCE_LINK_RE = re.compile(r"^[ \t]*\[[^\]\n]+\]:[ \t]*(\S+)", re.MULTILINE)
+HEADING_RE = re.compile(r"^(#{2,6})[ \t]+(.+?)[ \t]*#*[ \t]*$", re.MULTILINE)
+
+MAX_SKILL_NAME_LENGTH = 64
+MAX_DESCRIPTION_LENGTH = 1024
+CLAUDE_DESCRIPTION_MAX = 250
 MAX_CORE_LINES = 160
 MAX_CORE_WORDS = 1800
-CLAUDE_DESCRIPTION_MAX = 250
+CODEX_FRONTMATTER_KEYS = {"name", "description", "license", "allowed-tools", "metadata"}
+QUALITY_HEADINGS = {
+    "contract or output guidance": re.compile(
+        r"\b(contract|output|outputs|deliverable|deliverables|response format|return format)\b",
+        re.IGNORECASE,
+    ),
+    "edge cases or fallbacks": re.compile(
+        r"\b(edge cases?|fallbacks?|failure modes?|exceptions?)\b", re.IGNORECASE
+    ),
+    "an example or pattern anchor": re.compile(
+        r"\b(examples?|patterns?|samples?|representative requests?)\b", re.IGNORECASE
+    ),
+}
+
+
+if yaml is not None:
+    class _UniqueKeyLoader(yaml.SafeLoader):
+        """Safe YAML loader that rejects duplicate mapping keys."""
+
+
+    def _construct_unique_mapping(loader, node, deep: bool = False):
+        loader.flatten_mapping(node)
+        mapping = {}
+        for key_node, value_node in node.value:
+            key = loader.construct_object(key_node, deep=deep)
+            try:
+                duplicate = key in mapping
+            except TypeError as exc:
+                raise yaml.constructor.ConstructorError(
+                    "while constructing a mapping",
+                    node.start_mark,
+                    "found an unhashable key",
+                    key_node.start_mark,
+                ) from exc
+            if duplicate:
+                raise yaml.constructor.ConstructorError(
+                    "while constructing a mapping",
+                    node.start_mark,
+                    f"found duplicate key: {key}",
+                    key_node.start_mark,
+                )
+            mapping[key] = loader.construct_object(value_node, deep=deep)
+        return mapping
+
+
+    _UniqueKeyLoader.add_constructor(
+        yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
+        _construct_unique_mapping,
+    )
+else:
+    _UniqueKeyLoader = None
 
 
 @dataclass
@@ -27,146 +93,377 @@ class ValidationResult:
         return not self.errors
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Validate a skill directory without third-party dependencies."
+        description="Run static structure and packaging checks for agent skill packages."
     )
-    parser.add_argument(
-        "skill_dirs",
-        nargs="+",
-        help="One or more skill directories to validate.",
-    )
+    parser.add_argument("skill_dirs", nargs="+", help="One or more skill directories to check.")
     parser.add_argument(
         "--expect-codex",
         action="store_true",
-        help="Require Codex packaging files such as agents/openai.yaml.",
+        help="Require and statically check Codex agents/openai.yaml metadata.",
     )
     parser.add_argument(
         "--expect-claude",
         action="store_true",
-        help="Require a Claude project-skill mirror and validate Claude-specific constraints.",
+        help="Apply Claude's description limit to each target package.",
     )
-    return parser.parse_args()
+    parser.add_argument(
+        "--strict-quality",
+        action="store_true",
+        help="Require non-empty contract/output, edge/fallback, and example/pattern sections.",
+    )
+    return parser.parse_args(argv)
+
+
+def _append_once(items: list[str], message: str) -> None:
+    if message not in items:
+        items.append(message)
+
+
+def _load_yaml_mapping(
+    raw_text: str, source_name: str, result: ValidationResult
+) -> dict[object, object] | None:
+    if yaml is None or _UniqueKeyLoader is None:
+        result.errors.append(
+            f"{source_name} could not be validated: PyYAML>=6.0,<7 is required."
+        )
+        return None
+    try:
+        parsed = yaml.load(raw_text, Loader=_UniqueKeyLoader)
+    except yaml.YAMLError as exc:
+        detail = getattr(exc, "problem", None) or str(exc).splitlines()[0]
+        result.errors.append(f"{source_name} contains invalid YAML: {detail}")
+        return None
+    if not isinstance(parsed, dict):
+        result.errors.append(f"{source_name} must contain a YAML mapping.")
+        return None
+    return parsed
+
+
+def _strip_yaml_comment(value: str) -> str:
+    quote: str | None = None
+    escaped = False
+    for index, char in enumerate(value):
+        if escaped:
+            escaped = False
+            continue
+        if quote == '"' and char == "\\":
+            escaped = True
+            continue
+        if char in {'"', "'"}:
+            if quote is None:
+                quote = char
+            elif quote == char:
+                if char == "'" and index + 1 < len(value) and value[index + 1] == "'":
+                    continue
+                quote = None
+            continue
+        if char == "#" and quote is None and (index == 0 or value[index - 1].isspace()):
+            return value[:index].rstrip()
+    return value.rstrip()
+
+
+def _parse_string_scalar(
+    raw_value: str, field_name: str, result: ValidationResult
+) -> str | None:
+    value = _strip_yaml_comment(raw_value.strip())
+    if not value:
+        result.errors.append(f"{field_name} must be a non-empty string.")
+        return None
+    if value in {"|", ">", "|-", "|+", ">-", ">+"}:
+        result.errors.append(f"{field_name} must be a single-line string, not a block value.")
+        return None
+    if value.startswith('"'):
+        try:
+            parsed = json.loads(value)
+        except (json.JSONDecodeError, TypeError):
+            result.errors.append(f"{field_name} has an invalid quoted string value.")
+            return None
+        if not isinstance(parsed, str):
+            result.errors.append(f"{field_name} must be a string.")
+            return None
+        return parsed
+    if value.startswith("'"):
+        if len(value) < 2 or not value.endswith("'"):
+            result.errors.append(f"{field_name} has an invalid quoted string value.")
+            return None
+        inner = value[1:-1]
+        if re.search(r"(?<!')'(?!')", inner):
+            result.errors.append(f"{field_name} has an invalid quoted string value.")
+            return None
+        return inner.replace("''", "'")
+    if value.endswith(('"', "'")) or value[0] in "[{":
+        result.errors.append(f"{field_name} must be a string.")
+        return None
+    if re.search(r":[ \t]", value):
+        result.errors.append(f"{field_name} has an invalid unquoted scalar value.")
+        return None
+    if value.lower() in {"null", "~", "true", "false", ".nan", ".inf", "-.inf"} or NUMBER_RE.fullmatch(value):
+        result.errors.append(f"{field_name} must be a string.")
+        return None
+    return value
 
 
 def load_frontmatter(skill_md: Path, result: ValidationResult) -> tuple[dict[str, str], str]:
-    text = skill_md.read_text(encoding="utf-8")
+    try:
+        text = skill_md.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        result.errors.append(f"could not read SKILL.md: {exc}")
+        return {}, ""
     match = FRONTMATTER_RE.match(text)
     if not match:
-        result.errors.append("SKILL.md is missing YAML frontmatter.")
+        result.errors.append("SKILL.md is missing valid YAML frontmatter delimiters.")
         return {}, text
 
-    frontmatter_text = match.group(1)
-    body = text[match.end() :].lstrip("\n")
+    _load_yaml_mapping(match.group(1), "SKILL.md frontmatter", result)
+
+    raw_entries: dict[str, str | None] = {}
+    current_container: str | None = None
+    for line_number, raw_line in enumerate(match.group(1).splitlines(), start=2):
+        if not raw_line.strip() or raw_line.lstrip().startswith("#"):
+            continue
+        if raw_line[0].isspace():
+            if current_container is None:
+                result.errors.append(f"invalid frontmatter indentation on line {line_number}.")
+            elif current_container in {"name", "description"}:
+                _append_once(
+                    result.errors,
+                    f"{current_container} must be a single-line string, not a nested or block value.",
+                )
+            continue
+        current_container = None
+        key_match = TOP_LEVEL_KEY_RE.match(raw_line)
+        if not key_match:
+            result.errors.append(f"invalid frontmatter entry on line {line_number}.")
+            continue
+        key, raw_value = key_match.groups()
+        if key in raw_entries:
+            result.errors.append(f"duplicate frontmatter key: {key}")
+            continue
+        raw_value = (raw_value or "").strip()
+        raw_entries[key] = raw_value or None
+        if not raw_value or raw_value in {"|", ">", "|-", "|+", ">-", ">+"}:
+            current_container = key
+
     data: dict[str, str] = {}
-
-    for raw_line in frontmatter_text.splitlines():
-        line = raw_line.rstrip()
-        if not line.strip():
+    for key in ("name", "description"):
+        if key not in raw_entries:
+            result.errors.append(f"frontmatter is missing required key: {key}")
             continue
-        scalar = SCALAR_RE.match(line)
-        if not scalar:
-            if line.lstrip().startswith("description:") and (
-                line.rstrip().endswith("|") or line.rstrip().endswith(">")
-            ):
-                result.errors.append("description must be a single-line scalar, not a block value.")
+        raw_value = raw_entries[key]
+        if raw_value is None:
+            result.errors.append(f"{key} must be a non-empty single-line string.")
             continue
-        key, value = scalar.groups()
-        value = value.strip()
-        if key == "description" and value in {"|", ">"}:
-            result.errors.append("description must be a single-line scalar, not a block value.")
+        parsed = _parse_string_scalar(raw_value, key, result)
+        if parsed is not None:
+            data[key] = parsed.strip()
+
+    name = data.get("name", "")
+    if name:
+        if len(name) > MAX_SKILL_NAME_LENGTH:
+            result.errors.append(
+                f"name exceeds {MAX_SKILL_NAME_LENGTH} characters ({len(name)} found)."
+            )
+        if not NAME_RE.fullmatch(name):
+            result.errors.append(
+                "name must be hyphen-case: lowercase letters or digits separated by single hyphens."
+            )
+    description = data.get("description", "")
+    if description:
+        if len(description) > MAX_DESCRIPTION_LENGTH:
+            result.errors.append(
+                f"description exceeds {MAX_DESCRIPTION_LENGTH} characters ({len(description)} found)."
+            )
+        if "<" in description or ">" in description:
+            result.errors.append("description cannot contain angle brackets (< or >).")
+
+    return data | {"__keys__": "\0".join(raw_entries)}, text[match.end() :].lstrip("\n")
+
+
+def _mask_markdown_code(markdown: str) -> str:
+    output: list[str] = []
+    fence: str | None = None
+    for line in markdown.splitlines():
+        marker_match = re.match(r"^[ \t]*(```+|~~~+)", line)
+        if marker_match:
+            marker = marker_match.group(1)[0]
+            fence = None if fence == marker else marker if fence is None else fence
+            output.append("")
+        elif fence is not None:
+            output.append("")
+        else:
+            output.append(re.sub(r"`[^`\n]*`", "", line))
+    return "\n".join(output)
+
+
+def _link_target(raw_target: str) -> str:
+    target = raw_target.strip()
+    if target.startswith("<") and ">" in target:
+        return target[1 : target.index(">")]
+    return target.split(maxsplit=1)[0]
+
+
+def check_markdown_links(skill_md: Path, body: str, result: ValidationResult) -> None:
+    markdown = _mask_markdown_code(body)
+    targets = [match.group(1) for match in MARKDOWN_LINK_RE.finditer(markdown)]
+    targets.extend(match.group(1) for match in REFERENCE_LINK_RE.finditer(markdown))
+    for raw_target in targets:
+        target = _link_target(raw_target)
+        if not target or target.startswith(("#", "//")):
             continue
-        if value[:1] == value[-1:] and value[:1] in {'"', "'"}:
-            value = value[1:-1]
-        data[key] = value
-
-    if "name" not in data or not data["name"].strip():
-        result.errors.append("frontmatter is missing a non-empty name field.")
-    if "description" not in data or not data["description"].strip():
-        result.errors.append("frontmatter is missing a non-empty single-line description field.")
-    elif "\n" in data["description"]:
-        result.errors.append("description must stay on a single line.")
-
-    return data, body
-
-
-def check_required_files(
-    skill_dir: Path, result: ValidationResult, expect_codex: bool
-) -> Path | None:
-    skill_md = skill_dir / "SKILL.md"
-    if not skill_md.is_file():
-        result.errors.append("missing required file: SKILL.md")
-        return None
-
-    if expect_codex:
-        openai_yaml = skill_dir / "agents" / "openai.yaml"
-        if not openai_yaml.is_file():
-            result.errors.append("missing required Codex metadata file: agents/openai.yaml")
-
-    return skill_md
+        parsed = urlsplit(target)
+        if parsed.scheme:
+            continue
+        path_text = unquote(parsed.path).replace("\\ ", " ")
+        if not path_text:
+            continue
+        linked_path = Path(path_text)
+        if not linked_path.is_absolute():
+            linked_path = skill_md.parent / linked_path
+        if not linked_path.exists():
+            result.errors.append(f"broken local Markdown link: {target}")
 
 
 def check_no_nested_skill_files(skill_dir: Path, result: ValidationResult) -> None:
-    root_skill = (skill_dir / "SKILL.md").resolve()
+    root_skill = skill_dir / "SKILL.md"
     for nested_skill in skill_dir.rglob("SKILL.md"):
-        if nested_skill.resolve() == root_skill:
+        if nested_skill == root_skill:
             continue
         result.errors.append(
             f"installable package contains nested active skill: {nested_skill.relative_to(skill_dir)}"
         )
 
 
-def find_repo_root(skill_dir: Path) -> Path:
-    for candidate in [skill_dir, *skill_dir.parents]:
-        if (candidate / ".git").exists() or (candidate / ".claude").exists():
-            return candidate
-    return skill_dir
-
-
-def check_claude_mirror(skill_dir: Path, result: ValidationResult) -> Path | None:
-    repo_root = find_repo_root(skill_dir)
-    claude_skill_md = repo_root / ".claude" / "skills" / "skillskill" / "SKILL.md"
-    if not claude_skill_md.is_file():
-        result.errors.append(
-            "missing required Claude project skill: .claude/skills/skillskill/SKILL.md"
-        )
+def _parse_openai_interface(
+    openai_yaml: Path, result: ValidationResult
+) -> dict[str, str] | None:
+    try:
+        raw_text = openai_yaml.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        result.errors.append(f"could not read agents/openai.yaml: {exc}")
+        return {}
+    if _load_yaml_mapping(raw_text, "agents/openai.yaml", result) is None:
         return None
-    return claude_skill_md
+    lines = raw_text.splitlines()
+    interface_start: int | None = None
+    for index, line in enumerate(lines):
+        if line == "interface:":
+            if interface_start is not None:
+                result.errors.append("agents/openai.yaml contains duplicate interface mappings.")
+            interface_start = index
+    if interface_start is None:
+        result.errors.append("agents/openai.yaml is missing the interface mapping.")
+        return {}
+
+    interface: dict[str, str] = {}
+    for line_number, line in enumerate(lines[interface_start + 1 :], start=interface_start + 2):
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if not line[0].isspace():
+            break
+        stripped = line.lstrip()
+        entry = TOP_LEVEL_KEY_RE.match(stripped)
+        if not entry:
+            result.errors.append(f"invalid interface entry in agents/openai.yaml on line {line_number}.")
+            continue
+        key, raw_value = entry.groups()
+        if key in interface:
+            result.errors.append(f"duplicate interface key in agents/openai.yaml: {key}")
+            continue
+        scalar_text = (raw_value or "").strip()
+        if (
+            len(scalar_text) < 2
+            or scalar_text[0] not in {'"', "'"}
+            or scalar_text[-1] != scalar_text[0]
+        ):
+            result.errors.append(
+                f"interface.{key} must use a quoted string value in agents/openai.yaml."
+            )
+        parsed = _parse_string_scalar(scalar_text, f"interface.{key}", result)
+        if parsed is not None:
+            interface[key] = parsed.strip()
+    return interface
 
 
-def require_body_signal(body_lower: str, result: ValidationResult, label: str, patterns: list[str]) -> None:
-    if not any(pattern in body_lower for pattern in patterns):
-        result.errors.append(f"body is missing {label}.")
+def check_codex_metadata(skill_dir: Path, name: str, result: ValidationResult) -> None:
+    openai_yaml = skill_dir / "agents" / "openai.yaml"
+    if not openai_yaml.is_file():
+        result.errors.append("missing required Codex metadata file: agents/openai.yaml")
+        return
+    interface = _parse_openai_interface(openai_yaml, result)
+    if interface is None:
+        return
+    for key in ("display_name", "short_description", "default_prompt"):
+        if not interface.get(key):
+            result.errors.append(f"agents/openai.yaml is missing interface.{key}.")
+    short_description = interface.get("short_description", "")
+    if short_description and not 25 <= len(short_description) <= 64:
+        result.errors.append(
+            "interface.short_description must be 25-64 characters "
+            f"({len(short_description)} found)."
+        )
+    default_prompt = interface.get("default_prompt", "")
+    if name and default_prompt and f"${name}" not in default_prompt:
+        result.errors.append(f"interface.default_prompt must contain ${name}.")
+    for key in ("icon_small", "icon_large"):
+        icon = interface.get(key)
+        if not icon:
+            continue
+        parsed = urlsplit(icon)
+        icon_path = Path(unquote(parsed.path))
+        if parsed.scheme or icon_path.is_absolute():
+            result.errors.append(f"interface.{key} must reference a relative local file.")
+        elif not (skill_dir / icon_path).is_file():
+            result.errors.append(f"interface.{key} references a missing file: {icon}")
 
 
-def validate_body(body: str, result: ValidationResult) -> None:
-    body_lower = body.lower()
+def validate_strict_quality(body: str, result: ValidationResult) -> None:
+    matches = list(HEADING_RE.finditer(body))
+    sections: list[tuple[str, str]] = []
+    for index, match in enumerate(matches):
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(body)
+        sections.append((match.group(2).strip(), body[match.end() : end].strip()))
+    for label, heading_pattern in QUALITY_HEADINGS.items():
+        if not any(heading_pattern.search(heading) and content for heading, content in sections):
+            result.errors.append(f"strict quality check requires a non-empty section for {label}.")
 
-    require_body_signal(
-        body_lower,
-        result,
-        "contract guidance",
-        ["contract", "returns", "produces"],
-    )
-    require_body_signal(
-        body_lower,
-        result,
-        "output guidance",
-        ["output", "deliverable", "format", "sections"],
-    )
-    require_body_signal(
-        body_lower,
-        result,
-        "edge case guidance",
-        ["edge case", "edge cases"],
-    )
-    require_body_signal(
-        body_lower,
-        result,
-        "example guidance",
-        ["example", "examples"],
-    )
 
+def validate_skill_dir(
+    skill_dir: Path,
+    expect_codex: bool = False,
+    expect_claude: bool = False,
+    strict_quality: bool = False,
+) -> ValidationResult:
+    skill_dir = skill_dir.resolve()
+    result = ValidationResult(path=skill_dir)
+    skill_md = skill_dir / "SKILL.md"
+    if not skill_md.is_file():
+        result.errors.append("missing required file: SKILL.md")
+        return result
+
+    check_no_nested_skill_files(skill_dir, result)
+    data, body = load_frontmatter(skill_md, result)
+    keys = set(data.pop("__keys__", "").split("\0")) - {""}
+    if expect_codex:
+        unexpected = sorted(keys - CODEX_FRONTMATTER_KEYS)
+        if unexpected:
+            result.errors.append(
+                "unexpected Codex frontmatter key(s): "
+                + ", ".join(unexpected)
+                + "; allowed keys are: "
+                + ", ".join(sorted(CODEX_FRONTMATTER_KEYS))
+            )
+        check_codex_metadata(skill_dir, data.get("name", ""), result)
+    if expect_claude and len(data.get("description", "")) > CLAUDE_DESCRIPTION_MAX:
+        result.errors.append(
+            f"Claude description exceeds {CLAUDE_DESCRIPTION_MAX} characters "
+            f"({len(data['description'])} found)."
+        )
+
+    check_markdown_links(skill_md, body, result)
+    if strict_quality:
+        validate_strict_quality(body, result)
     line_count = len(body.splitlines())
     word_count = len(body.split())
     if line_count > MAX_CORE_LINES:
@@ -177,141 +474,25 @@ def validate_body(body: str, result: ValidationResult) -> None:
         result.warnings.append(
             f"core body is {word_count} words; consider shortening the core file."
         )
-
-
-def validate_claude_frontmatter(data: dict[str, str], result: ValidationResult) -> None:
-    description = data.get("description", "")
-    if description and len(description) > CLAUDE_DESCRIPTION_MAX:
-        result.errors.append(
-            f"Claude description exceeds {CLAUDE_DESCRIPTION_MAX} characters."
-        )
-
-
-def normalize_frontmatter(
-    text: str, *, description_override: str | None = None, argument_hint_override: str | None = None
-) -> str:
-    lines: list[str] = []
-    in_frontmatter = False
-    frontmatter_seen = 0
-
-    for line in text.splitlines():
-        if line == "---":
-            frontmatter_seen += 1
-            in_frontmatter = frontmatter_seen == 1
-            lines.append(line)
-            continue
-        if frontmatter_seen == 1 and in_frontmatter:
-            if line.startswith("description:") and description_override is not None:
-                lines.append(f'description: "{description_override}"')
-                continue
-            if line.startswith("argument-hint:"):
-                if argument_hint_override is not None:
-                    lines.append(f'argument-hint: "{argument_hint_override}"')
-                continue
-        lines.append(line)
-
-    if argument_hint_override is not None and frontmatter_seen >= 1:
-        output: list[str] = []
-        inserted = False
-        inside = False
-        for line in lines:
-            output.append(line)
-            if line == "---" and not inside:
-                inside = True
-                continue
-            if inside and line.startswith('description: "') and not inserted:
-                output.append(f'argument-hint: "{argument_hint_override}"')
-                inserted = True
-            elif inside and line == "---":
-                inside = False
-        lines = output
-
-    return "\n".join(lines) + ("\n" if text.endswith("\n") else "")
-
-
-def validate_claude_skill(
-    skill_dir: Path, canonical_skill_md: Path, result: ValidationResult
-) -> None:
-    claude_skill_md = check_claude_mirror(skill_dir, result)
-    if not claude_skill_md:
-        return
-
-    claude_data, claude_body = load_frontmatter(claude_skill_md, result)
-    claude_description = claude_data.get("description", "")
-    validate_claude_frontmatter(claude_data, result)
-    if "argument-hint:" not in claude_skill_md.read_text(encoding="utf-8"):
-        result.warnings.append(
-            "Claude mirror is missing argument-hint; slash-command usage may be less clear."
-        )
-    if claude_body:
-        validate_body(claude_body, result)
-
-    canonical_text = canonical_skill_md.read_text(encoding="utf-8")
-    claude_text = claude_skill_md.read_text(encoding="utf-8")
-    expected_claude = normalize_frontmatter(
-        canonical_text,
-        description_override=claude_description,
-        argument_hint_override=claude_data.get("argument-hint", "[request or path]"),
-    )
-    expected_claude = expected_claude.replace(
-        "[references/rubric.md](references/rubric.md)",
-        "[../../../packages/codex/skillskill/references/rubric.md](../../../packages/codex/skillskill/references/rubric.md)",
-    ).replace(
-        "[references/review-checklist.md](references/review-checklist.md)",
-        "[../../../packages/codex/skillskill/references/review-checklist.md](../../../packages/codex/skillskill/references/review-checklist.md)",
-    ).replace(
-        "## Codex Packaging",
-        "## Packaging Notes",
-    ).replace(
-        "If local files are available, validate Codex-oriented packages with `python3 scripts/validate_skill.py <skill-dir>` before finishing.",
-        "When local files are available, validate both canonical and Claude packaging with `python3 scripts/validate_skill.py --expect-codex --expect-claude packages/codex/skillskill`.",
-    )
-
-    if claude_text != expected_claude:
-        result.errors.append(
-            "Claude mirror has drifted from the canonical skill beyond the approved packaging differences."
-        )
-
-
-def validate_skill_dir(skill_dir: Path, expect_codex: bool, expect_claude: bool) -> ValidationResult:
-    result = ValidationResult(path=skill_dir)
-    skill_md = check_required_files(skill_dir, result, expect_codex)
-    if not skill_md:
-        return result
-    check_no_nested_skill_files(skill_dir, result)
-
-    data, body = load_frontmatter(skill_md, result)
-    if body:
-        validate_body(body, result)
-
-    if expect_claude:
-        if skill_dir.parts[-3:] == (".claude", "skills", "skillskill"):
-            validate_claude_frontmatter(data, result)
-        else:
-            validate_claude_skill(skill_dir, skill_md, result)
-
     return result
 
 
-def main() -> int:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
     overall_ok = True
-
     for raw_path in args.skill_dirs:
-        skill_dir = Path(raw_path).resolve()
         result = validate_skill_dir(
-            skill_dir,
+            Path(raw_path),
             expect_codex=args.expect_codex,
             expect_claude=args.expect_claude,
+            strict_quality=args.strict_quality,
         )
-        status = "PASS" if result.ok() else "FAIL"
-        print(f"{status} {result.path}")
+        print(f"STATIC {'PASS' if result.ok() else 'FAIL'} {result.path}")
         for error in result.errors:
             print(f"  ERROR: {error}")
         for warning in result.warnings:
             print(f"  WARN: {warning}")
         overall_ok = overall_ok and result.ok()
-
     return 0 if overall_ok else 1
 
 
