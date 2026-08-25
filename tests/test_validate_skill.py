@@ -10,6 +10,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -97,6 +98,88 @@ description: A skill with headings but no substantive section content.
         result = validator.validate_skill_dir(package)
         self.assertFalse(result.ok())
         self.assertTrue(any("single-line" in error for error in result.errors))
+
+    def test_malformed_yaml_in_allowed_frontmatter_field_is_rejected(self) -> None:
+        package = self.write_skill(
+            """---
+name: malformed-frontmatter
+description: Reject malformed YAML anywhere in the frontmatter mapping.
+license: [unterminated
+---
+# Malformed Frontmatter
+"""
+        )
+        result = validator.validate_skill_dir(package)
+        self.assertFalse(result.ok())
+        self.assertTrue(any("frontmatter contains invalid YAML" in error for error in result.errors))
+
+    def test_missing_yaml_dependency_fails_closed(self) -> None:
+        package = self.stage_fixture("valid-skill")
+        with (
+            mock.patch.object(validator, "yaml", None),
+            mock.patch.object(validator, "_UniqueKeyLoader", None),
+        ):
+            result = validator.validate_skill_dir(package)
+        self.assertFalse(result.ok())
+        self.assertTrue(any("PyYAML>=6.0,<7 is required" in error for error in result.errors))
+
+    def test_malformed_yaml_outside_openai_interface_is_rejected(self) -> None:
+        package = self.stage_fixture("valid-skill")
+        self.write_codex_metadata(
+            package,
+            """interface:
+  display_name: "Market Scan"
+  short_description: "Create a decision-ready market scan"
+  default_prompt: "Use $market-scan to compare this market."
+dependencies:
+  tools:
+    - type: "mcp"
+      value: [unterminated
+""",
+        )
+        result = validator.validate_skill_dir(package, expect_codex=True)
+        self.assertFalse(result.ok())
+        self.assertTrue(any("openai.yaml contains invalid YAML" in error for error in result.errors))
+
+    def test_duplicate_nested_yaml_key_is_rejected(self) -> None:
+        package = self.stage_fixture("valid-skill")
+        self.write_codex_metadata(
+            package,
+            """interface:
+  display_name: "Market Scan"
+  short_description: "Create a decision-ready market scan"
+  default_prompt: "Use $market-scan to compare this market."
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "github"
+      value: "duplicate"
+""",
+        )
+        result = validator.validate_skill_dir(package, expect_codex=True)
+        self.assertFalse(result.ok())
+        self.assertTrue(any("duplicate key" in error for error in result.errors))
+
+    def test_supported_openai_dependencies_and_policy_yaml_passes(self) -> None:
+        package = self.stage_fixture("valid-skill")
+        self.write_codex_metadata(
+            package,
+            """interface:
+  display_name: "Market Scan"
+  short_description: "Create a decision-ready market scan"
+  default_prompt: "Use $market-scan to compare this market."
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "github"
+      description: "GitHub MCP server"
+      transport: "streamable_http"
+      url: "https://api.githubcopilot.com/mcp/"
+policy:
+  allow_implicit_invocation: true
+""",
+        )
+        self.assertTrue(validator.validate_skill_dir(package, expect_codex=True).ok())
 
     def test_name_and_description_constraints(self) -> None:
         cases = {
@@ -232,6 +315,11 @@ See [local](references/guide.md), [anchor](#linked), and [web](https://example.c
         self.assertEqual(VALIDATOR_PATH.read_bytes(), PACKAGE_VALIDATOR_PATH.read_bytes())
         self.assertTrue(os.access(VALIDATOR_PATH, os.X_OK))
         self.assertTrue(os.access(PACKAGE_VALIDATOR_PATH, os.X_OK))
+
+    def test_validator_requirements_are_shipped_with_the_package(self) -> None:
+        root_requirements = REPO_ROOT / "requirements.txt"
+        package_requirements = PACKAGE_VALIDATOR_PATH.parent / "requirements.txt"
+        self.assertEqual(root_requirements.read_bytes(), package_requirements.read_bytes())
 
 
 class BehavioralManifestTests(unittest.TestCase):

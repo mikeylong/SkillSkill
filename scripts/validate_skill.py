@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run dependency-free static checks on one or more skill packages."""
+"""Run static checks on one or more skill packages."""
 
 from __future__ import annotations
 
@@ -10,6 +10,11 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
+
+try:
+    import yaml
+except ImportError:  # pragma: no cover - exercised through the fail-closed branch
+    yaml = None
 
 
 FRONTMATTER_RE = re.compile(r"\A---[ \t]*\n(.*?)\n---[ \t]*(?:\n|\Z)", re.DOTALL)
@@ -40,6 +45,44 @@ QUALITY_HEADINGS = {
 }
 
 
+if yaml is not None:
+    class _UniqueKeyLoader(yaml.SafeLoader):
+        """Safe YAML loader that rejects duplicate mapping keys."""
+
+
+    def _construct_unique_mapping(loader, node, deep: bool = False):
+        loader.flatten_mapping(node)
+        mapping = {}
+        for key_node, value_node in node.value:
+            key = loader.construct_object(key_node, deep=deep)
+            try:
+                duplicate = key in mapping
+            except TypeError as exc:
+                raise yaml.constructor.ConstructorError(
+                    "while constructing a mapping",
+                    node.start_mark,
+                    "found an unhashable key",
+                    key_node.start_mark,
+                ) from exc
+            if duplicate:
+                raise yaml.constructor.ConstructorError(
+                    "while constructing a mapping",
+                    node.start_mark,
+                    f"found duplicate key: {key}",
+                    key_node.start_mark,
+                )
+            mapping[key] = loader.construct_object(value_node, deep=deep)
+        return mapping
+
+
+    _UniqueKeyLoader.add_constructor(
+        yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
+        _construct_unique_mapping,
+    )
+else:
+    _UniqueKeyLoader = None
+
+
 @dataclass
 class ValidationResult:
     path: Path
@@ -52,7 +95,7 @@ class ValidationResult:
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Run static structure and packaging checks without third-party dependencies."
+        description="Run static structure and packaging checks for agent skill packages."
     )
     parser.add_argument("skill_dirs", nargs="+", help="One or more skill directories to check.")
     parser.add_argument(
@@ -76,6 +119,26 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def _append_once(items: list[str], message: str) -> None:
     if message not in items:
         items.append(message)
+
+
+def _load_yaml_mapping(
+    raw_text: str, source_name: str, result: ValidationResult
+) -> dict[object, object] | None:
+    if yaml is None or _UniqueKeyLoader is None:
+        result.errors.append(
+            f"{source_name} could not be validated: PyYAML>=6.0,<7 is required."
+        )
+        return None
+    try:
+        parsed = yaml.load(raw_text, Loader=_UniqueKeyLoader)
+    except yaml.YAMLError as exc:
+        detail = getattr(exc, "problem", None) or str(exc).splitlines()[0]
+        result.errors.append(f"{source_name} contains invalid YAML: {detail}")
+        return None
+    if not isinstance(parsed, dict):
+        result.errors.append(f"{source_name} must contain a YAML mapping.")
+        return None
+    return parsed
 
 
 def _strip_yaml_comment(value: str) -> str:
@@ -152,6 +215,8 @@ def load_frontmatter(skill_md: Path, result: ValidationResult) -> tuple[dict[str
     if not match:
         result.errors.append("SKILL.md is missing valid YAML frontmatter delimiters.")
         return {}, text
+
+    _load_yaml_mapping(match.group(1), "SKILL.md frontmatter", result)
 
     raw_entries: dict[str, str | None] = {}
     current_container: str | None = None
@@ -270,12 +335,17 @@ def check_no_nested_skill_files(skill_dir: Path, result: ValidationResult) -> No
         )
 
 
-def _parse_openai_interface(openai_yaml: Path, result: ValidationResult) -> dict[str, str]:
+def _parse_openai_interface(
+    openai_yaml: Path, result: ValidationResult
+) -> dict[str, str] | None:
     try:
-        lines = openai_yaml.read_text(encoding="utf-8").splitlines()
+        raw_text = openai_yaml.read_text(encoding="utf-8")
     except (OSError, UnicodeError) as exc:
         result.errors.append(f"could not read agents/openai.yaml: {exc}")
         return {}
+    if _load_yaml_mapping(raw_text, "agents/openai.yaml", result) is None:
+        return None
+    lines = raw_text.splitlines()
     interface_start: int | None = None
     for index, line in enumerate(lines):
         if line == "interface:":
@@ -322,6 +392,8 @@ def check_codex_metadata(skill_dir: Path, name: str, result: ValidationResult) -
         result.errors.append("missing required Codex metadata file: agents/openai.yaml")
         return
     interface = _parse_openai_interface(openai_yaml, result)
+    if interface is None:
+        return
     for key in ("display_name", "short_description", "default_prompt"):
         if not interface.get(key):
             result.errors.append(f"agents/openai.yaml is missing interface.{key}.")

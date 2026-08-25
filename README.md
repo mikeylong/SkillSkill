@@ -43,6 +43,12 @@ Personal installs work differently. [`scripts/install.sh`](scripts/install.sh) v
 
 ## Install
 
+The local installer and validator require Python 3.10+ and PyYAML:
+
+```bash
+python3 -m pip install -r requirements.txt
+```
+
 ### From A Local Clone
 
 Install for Codex:
@@ -101,6 +107,8 @@ Run strict static validation from the repository root:
 ```bash
 python3 scripts/validate_skill.py --expect-codex --expect-claude --strict-quality packages/codex/skillskill
 ```
+
+For an installed standalone package, the same dependency declaration is shipped at `scripts/requirements.txt`.
 
 Static validation checks deterministic rules for package structure, frontmatter, Codex metadata, local links, and required quality sections. A `STATIC PASS` means those checks passed, but does not prove that a model will route to the skill or follow it correctly.
 
