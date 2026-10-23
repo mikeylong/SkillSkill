@@ -10,6 +10,19 @@ Record the candidate and incumbent paths, commit or content hash, installed runt
 
 Use raw, realistic user requests. Include no diagnosis, intended fix, expected answer, or rubric language in trial prompts.
 
+### Make Every Case Runnable
+
+For each routing or execution case, preserve:
+
+- A stable case ID and case type.
+- The raw user prompt, unchanged by diagnosis or scoring guidance.
+- Fixture paths or contents, required capabilities, and the setup needed to run it.
+- Explicit observable expected checks. For routing, name the expected skill or `none`. For execution, state required outputs, allowed side effects, forbidden actions, and pass/fail criteria.
+
+Keep expected checks in an evaluator-only field or table, separate from raw prompts. Do not show those checks to forward-test workers. A list of prompts without expected checks is an incomplete handoff.
+
+When agents or required capabilities are unavailable, return this complete pending basket in the report or an authorized artifact, identify the missing capability, and mark the affected checks `Not tested`. Do not substitute a successful static check for the blocked run.
+
 ### Minimal Basket
 
 Use for a fast audit or low-risk revision:

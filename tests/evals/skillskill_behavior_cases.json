@@ -183,7 +183,8 @@
     "preserve_conventions": ["preserves_existing_conventions", "changes_only_blockers"],
     "platform_unspecified": ["portable_core", "no_platform_specific_metadata"],
     "current_codex_packaging": ["codex_frontmatter_valid", "openai_yaml_valid", "dollar_skill_prompt", "static_validation"],
-    "deterministic_script_boundary": ["identifies_deterministic_step", "uses_or_recommends_script", "does_not_overpromise_prose"]
+    "deterministic_script_boundary": ["identifies_deterministic_step", "uses_or_recommends_script", "does_not_overpromise_prose"],
+    "unavailable_evaluation": ["marks_unrun_checks_not_tested", "preserves_raw_prompt_basket", "pairs_prompts_with_explicit_expected_checks", "keeps_expected_checks_out_of_worker_prompts"]
   },
   "execution_cases": [
     {
@@ -233,6 +234,12 @@
       "category": "deterministic_script_boundary",
       "prompt": "Audit this existing skill: it must normalize identifiers and reject malformed metadata identically every time.",
       "required_gates": ["identifies_deterministic_step", "uses_or_recommends_script", "does_not_overpromise_prose"]
+    },
+    {
+      "id": "exec-unavailable-01",
+      "category": "unavailable_evaluation",
+      "prompt": "Evaluate whether this installed skill is ready to release. Fresh agents and its required external provider are unavailable; preserve what another evaluator needs to finish.",
+      "required_gates": ["marks_unrun_checks_not_tested", "preserves_raw_prompt_basket", "pairs_prompts_with_explicit_expected_checks", "keeps_expected_checks_out_of_worker_prompts"]
     }
   ]
 }

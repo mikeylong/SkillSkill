@@ -6,6 +6,19 @@ SkillSkill audits and improves agent-readable skill packages. Use it when a skil
 
 SkillSkill is strongest as the review layer around a platform's native skill creator. Let the native creator handle routine scaffolding. Use SkillSkill for deeper audits, targeted revisions, cross-platform ports, and behavioral evaluation.
 
+## SkillSkill Or A Native Skill Creator?
+
+| Job | Better choice |
+| --- | --- |
+| Create a new agent skill | Platform-native skill creator |
+| Make an ordinary focused update | Platform-native skill creator |
+| Apply platform-native packaging conventions | Platform-native skill creator |
+| Audit routing, authority, and contract quality | SkillSkill |
+| Map source, installed copies, and runtime drift | SkillSkill |
+| Run metadata confusion tests and execution A/Bs | SkillSkill |
+| Score regression evidence and release readiness | SkillSkill |
+| Run a lightweight independent forward test | Roughly tied |
+
 Example:
 
 > `$skillskill audit this release-notes skill. Check routing, output contracts, edge cases, packaging, and forward-test coverage. Keep the audit read-only.`
@@ -109,6 +122,8 @@ python3 scripts/validate_skill.py --expect-codex --expect-claude --strict-qualit
 ```
 
 For an installed standalone package, the same dependency declaration is shipped at `scripts/requirements.txt`.
+
+`--expect-codex` applies Codex frontmatter rules. `agents/openai.yaml`, its `interface` mapping, and each UI field are optional. When supplied, the file must contain valid YAML and UI fields must satisfy their native constraints, including quoted strings, a 25–64 character `short_description`, and a `default_prompt` that mentions `$skill-name`. Policy-only and dependency-only metadata files are supported.
 
 Static validation checks deterministic rules for package structure, frontmatter, Codex metadata, local links, and required quality sections. A `STATIC PASS` means those checks passed, but does not prove that a model will route to the skill or follow it correctly.
 

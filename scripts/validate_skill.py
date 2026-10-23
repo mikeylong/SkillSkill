@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import re
 import sys
 from dataclasses import dataclass, field
@@ -20,7 +19,6 @@ except ImportError:  # pragma: no cover - exercised through the fail-closed bran
 FRONTMATTER_RE = re.compile(r"\A---[ \t]*\n(.*?)\n---[ \t]*(?:\n|\Z)", re.DOTALL)
 TOP_LEVEL_KEY_RE = re.compile(r"^([A-Za-z][A-Za-z0-9_-]*):(?:[ \t]*(.*))?$")
 NAME_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
-NUMBER_RE = re.compile(r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?\Z")
 MARKDOWN_LINK_RE = re.compile(r"!?\[[^\]\n]*\]\(([^)\n]+)\)")
 REFERENCE_LINK_RE = re.compile(r"^[ \t]*\[[^\]\n]+\]:[ \t]*(\S+)", re.MULTILINE)
 HEADING_RE = re.compile(r"^(#{2,6})[ \t]+(.+?)[ \t]*#*[ \t]*$", re.MULTILINE)
@@ -101,7 +99,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--expect-codex",
         action="store_true",
-        help="Require and statically check Codex agents/openai.yaml metadata.",
+        help="Apply Codex frontmatter rules and check optional agents/openai.yaml metadata when present.",
     )
     parser.add_argument(
         "--expect-claude",
@@ -141,68 +139,23 @@ def _load_yaml_mapping(
     return parsed
 
 
-def _strip_yaml_comment(value: str) -> str:
-    quote: str | None = None
-    escaped = False
-    for index, char in enumerate(value):
-        if escaped:
-            escaped = False
-            continue
-        if quote == '"' and char == "\\":
-            escaped = True
-            continue
-        if char in {'"', "'"}:
-            if quote is None:
-                quote = char
-            elif quote == char:
-                if char == "'" and index + 1 < len(value) and value[index + 1] == "'":
-                    continue
-                quote = None
-            continue
-        if char == "#" and quote is None and (index == 0 or value[index - 1].isspace()):
-            return value[:index].rstrip()
-    return value.rstrip()
-
-
 def _parse_string_scalar(
-    raw_value: str, field_name: str, result: ValidationResult
+    raw_value: str, parsed_value: object, field_name: str, result: ValidationResult
 ) -> str | None:
-    value = _strip_yaml_comment(raw_value.strip())
-    if not value:
-        result.errors.append(f"{field_name} must be a non-empty string.")
-        return None
-    if value in {"|", ">", "|-", "|+", ">-", ">+"}:
+    # YAML owns scalar decoding and types; raw text only enforces presentation policy.
+    if raw_value.lstrip().startswith(("|", ">")):
         result.errors.append(f"{field_name} must be a single-line string, not a block value.")
         return None
-    if value.startswith('"'):
-        try:
-            parsed = json.loads(value)
-        except (json.JSONDecodeError, TypeError):
-            result.errors.append(f"{field_name} has an invalid quoted string value.")
-            return None
-        if not isinstance(parsed, str):
-            result.errors.append(f"{field_name} must be a string.")
-            return None
-        return parsed
-    if value.startswith("'"):
-        if len(value) < 2 or not value.endswith("'"):
-            result.errors.append(f"{field_name} has an invalid quoted string value.")
-            return None
-        inner = value[1:-1]
-        if re.search(r"(?<!')'(?!')", inner):
-            result.errors.append(f"{field_name} has an invalid quoted string value.")
-            return None
-        return inner.replace("''", "'")
-    if value.endswith(('"', "'")) or value[0] in "[{":
+    if not isinstance(parsed_value, str):
         result.errors.append(f"{field_name} must be a string.")
         return None
-    if re.search(r":[ \t]", value):
-        result.errors.append(f"{field_name} has an invalid unquoted scalar value.")
+    if not parsed_value.strip():
+        result.errors.append(f"{field_name} must be a non-empty string.")
         return None
-    if value.lower() in {"null", "~", "true", "false", ".nan", ".inf", "-.inf"} or NUMBER_RE.fullmatch(value):
-        result.errors.append(f"{field_name} must be a string.")
+    if len(parsed_value.splitlines()) != 1 or "\r" in parsed_value or "\n" in parsed_value:
+        result.errors.append(f"{field_name} must be a single-line string.")
         return None
-    return value
+    return parsed_value
 
 
 def load_frontmatter(skill_md: Path, result: ValidationResult) -> tuple[dict[str, str], str]:
@@ -216,7 +169,9 @@ def load_frontmatter(skill_md: Path, result: ValidationResult) -> tuple[dict[str
         result.errors.append("SKILL.md is missing valid YAML frontmatter delimiters.")
         return {}, text
 
-    _load_yaml_mapping(match.group(1), "SKILL.md frontmatter", result)
+    parsed_frontmatter = _load_yaml_mapping(match.group(1), "SKILL.md frontmatter", result)
+    if parsed_frontmatter is None:
+        return {}, text[match.end() :].lstrip("\n")
 
     raw_entries: dict[str, str | None] = {}
     current_container: str | None = None
@@ -255,7 +210,7 @@ def load_frontmatter(skill_md: Path, result: ValidationResult) -> tuple[dict[str
         if raw_value is None:
             result.errors.append(f"{key} must be a non-empty single-line string.")
             continue
-        parsed = _parse_string_scalar(raw_value, key, result)
+        parsed = _parse_string_scalar(raw_value, parsed_frontmatter.get(key), key, result)
         if parsed is not None:
             data[key] = parsed.strip()
 
@@ -305,24 +260,58 @@ def _link_target(raw_target: str) -> str:
 
 
 def check_markdown_links(skill_md: Path, body: str, result: ValidationResult) -> None:
-    markdown = _mask_markdown_code(body)
-    targets = [match.group(1) for match in MARKDOWN_LINK_RE.finditer(markdown)]
-    targets.extend(match.group(1) for match in REFERENCE_LINK_RE.finditer(markdown))
-    for raw_target in targets:
-        target = _link_target(raw_target)
-        if not target or target.startswith(("#", "//")):
+    package_root = skill_md.parent.resolve()
+    # Keep the core's package path even if SKILL.md itself is a symlink.
+    pending = [(package_root / skill_md.name, body)]
+    # File identity alone loses the relative-link context of file symlink aliases.
+    # Resolve the context directory too so ../ and directory symlink cycles converge.
+    visited: set[tuple[Path, Path]] = set()
+    while pending:
+        source, source_body = pending.pop()
+        source_identity = (source.resolve(), source.parent.resolve())
+        if source_identity in visited:
             continue
-        parsed = urlsplit(target)
-        if parsed.scheme:
-            continue
-        path_text = unquote(parsed.path).replace("\\ ", " ")
-        if not path_text:
-            continue
-        linked_path = Path(path_text)
-        if not linked_path.is_absolute():
-            linked_path = skill_md.parent / linked_path
-        if not linked_path.exists():
-            result.errors.append(f"broken local Markdown link: {target}")
+        visited.add(source_identity)
+        source_label = source.relative_to(package_root) if source.is_relative_to(package_root) else source
+        markdown = _mask_markdown_code(source_body)
+        targets = [match.group(1) for match in MARKDOWN_LINK_RE.finditer(markdown)]
+        targets.extend(match.group(1) for match in REFERENCE_LINK_RE.finditer(markdown))
+        for raw_target in targets:
+            target = _link_target(raw_target)
+            if not target or target.startswith(("#", "//")):
+                continue
+            parsed = urlsplit(target)
+            if parsed.scheme:
+                continue
+            path_text = unquote(parsed.path).replace("\\ ", " ")
+            if not path_text:
+                continue
+            linked_path = Path(path_text)
+            if not linked_path.is_absolute():
+                linked_path = source.parent / linked_path
+            if not linked_path.exists():
+                result.errors.append(
+                    f"broken local Markdown link in {source_label}: {target}"
+                )
+                continue
+            resolved = linked_path.resolve()
+            linked_identity = (resolved, linked_path.parent.resolve())
+            if (
+                linked_identity in visited
+                or not resolved.is_relative_to(package_root)
+                or not resolved.is_file()
+                or resolved.suffix.lower() not in {".md", ".markdown"}
+            ):
+                continue
+            try:
+                linked_body = resolved.read_text(encoding="utf-8")
+            except (OSError, UnicodeError) as exc:
+                result.errors.append(
+                    f"could not read local Markdown reference {resolved.relative_to(package_root)}: {exc}"
+                )
+                visited.add(linked_identity)
+                continue
+            pending.append((linked_path, linked_body))
 
 
 def check_no_nested_skill_files(skill_dir: Path, result: ValidationResult) -> None:
@@ -343,60 +332,63 @@ def _parse_openai_interface(
     except (OSError, UnicodeError) as exc:
         result.errors.append(f"could not read agents/openai.yaml: {exc}")
         return {}
-    if _load_yaml_mapping(raw_text, "agents/openai.yaml", result) is None:
+    parsed_metadata = _load_yaml_mapping(raw_text, "agents/openai.yaml", result)
+    if parsed_metadata is None:
         return None
-    lines = raw_text.splitlines()
-    interface_start: int | None = None
-    for index, line in enumerate(lines):
-        if line == "interface:":
-            if interface_start is not None:
-                result.errors.append("agents/openai.yaml contains duplicate interface mappings.")
-            interface_start = index
-    if interface_start is None:
-        result.errors.append("agents/openai.yaml is missing the interface mapping.")
+    if "interface" not in parsed_metadata:
         return {}
+    parsed_interface = parsed_metadata["interface"]
+    if not isinstance(parsed_interface, dict):
+        result.errors.append("agents/openai.yaml interface must contain a YAML mapping.")
+        return None
 
-    interface: dict[str, str] = {}
-    for line_number, line in enumerate(lines[interface_start + 1 :], start=interface_start + 2):
-        if not line.strip() or line.lstrip().startswith("#"):
-            continue
-        if not line[0].isspace():
-            break
-        stripped = line.lstrip()
-        entry = TOP_LEVEL_KEY_RE.match(stripped)
-        if not entry:
-            result.errors.append(f"invalid interface entry in agents/openai.yaml on line {line_number}.")
-            continue
-        key, raw_value = entry.groups()
-        if key in interface:
-            result.errors.append(f"duplicate interface key in agents/openai.yaml: {key}")
-            continue
-        scalar_text = (raw_value or "").strip()
-        if (
-            len(scalar_text) < 2
-            or scalar_text[0] not in {'"', "'"}
-            or scalar_text[-1] != scalar_text[0]
-        ):
-            result.errors.append(
-                f"interface.{key} must use a quoted string value in agents/openai.yaml."
+    # YAML nodes retain scalar spelling without imposing a line-oriented layout.
+    # Flatten merges as the unique-key loader does so inherited fields are checked too.
+    loader = _UniqueKeyLoader(raw_text)
+    try:
+        metadata_node = loader.get_single_node()
+        loader.flatten_mapping(metadata_node)
+        interface_key, interface_node = next(
+            (key, value) for key, value in metadata_node.value if key.value == "interface"
+        )
+        if interface_key.style is not None:
+            result.errors.append("interface must use an unquoted key in agents/openai.yaml.")
+        loader.flatten_mapping(interface_node)
+        interface: dict[str, str] = {}
+        for key_node, value_node in interface_node.value:
+            key = loader.construct_object(key_node)
+            if (
+                not isinstance(key, str)
+                or key_node.style is not None
+                or not TOP_LEVEL_KEY_RE.fullmatch(f"{key}:")
+            ):
+                result.errors.append("interface keys must be unquoted names in agents/openai.yaml.")
+                continue
+            scalar_text = raw_text[value_node.start_mark.index : value_node.end_mark.index].strip()
+            if not isinstance(value_node, yaml.ScalarNode) or value_node.style not in {'"', "'"}:
+                result.errors.append(
+                    f"interface.{key} must use a quoted string value in agents/openai.yaml."
+                )
+            parsed = _parse_string_scalar(
+                scalar_text, parsed_interface[key], f"interface.{key}", result
             )
-        parsed = _parse_string_scalar(scalar_text, f"interface.{key}", result)
-        if parsed is not None:
-            interface[key] = parsed.strip()
-    return interface
+            if parsed is not None:
+                interface[key] = parsed.strip()
+        return interface
+    finally:
+        loader.dispose()
 
 
 def check_codex_metadata(skill_dir: Path, name: str, result: ValidationResult) -> None:
     openai_yaml = skill_dir / "agents" / "openai.yaml"
+    if not openai_yaml.exists() and not openai_yaml.is_symlink():
+        return
     if not openai_yaml.is_file():
-        result.errors.append("missing required Codex metadata file: agents/openai.yaml")
+        result.errors.append("Codex metadata path must be a file: agents/openai.yaml")
         return
     interface = _parse_openai_interface(openai_yaml, result)
     if interface is None:
         return
-    for key in ("display_name", "short_description", "default_prompt"):
-        if not interface.get(key):
-            result.errors.append(f"agents/openai.yaml is missing interface.{key}.")
     short_description = interface.get("short_description", "")
     if short_description and not 25 <= len(short_description) <= 64:
         result.errors.append(

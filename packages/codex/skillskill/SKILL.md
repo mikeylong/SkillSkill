@@ -68,7 +68,7 @@ When the user explicitly invokes `$skillskill` to create a new skill, compose wi
 
 - When multiple active copies disagree, identify the discovered runtime, map the drift, and avoid overwriting either copy until the source of truth is established.
 - When the platform is unspecified, audit the platform-neutral contract and observed runtime; do not invent packaging rules.
-- When clean-agent evaluation is unavailable, preserve a runnable prompt basket and mark behavioral checks `Not tested`.
+- When clean-agent evaluation is unavailable, preserve a runnable prompt basket with case IDs, raw prompts, fixture and capability setup, and explicit observable expected checks. Keep expected checks separate from worker prompts, and mark behavioral checks `Not tested`.
 - When static checks pass but behavior remains untested, report `Static: Pass` and `Behavioral: Not tested`; do not claim release readiness.
 
 ## Example Requests
