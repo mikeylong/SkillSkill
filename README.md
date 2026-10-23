@@ -123,6 +123,8 @@ python3 scripts/validate_skill.py --expect-codex --expect-claude --strict-qualit
 
 For an installed standalone package, the same dependency declaration is shipped at `scripts/requirements.txt`.
 
+`--expect-codex` applies Codex frontmatter rules. `agents/openai.yaml`, its `interface` mapping, and each UI field are optional. When supplied, the file must contain valid YAML and UI fields must satisfy their native constraints, including quoted strings, a 25–64 character `short_description`, and a `default_prompt` that mentions `$skill-name`. Policy-only and dependency-only metadata files are supported.
+
 Static validation checks deterministic rules for package structure, frontmatter, Codex metadata, local links, and required quality sections. A `STATIC PASS` means those checks passed, but does not prove that a model will route to the skill or follow it correctly.
 
 Run the repository tests with:
